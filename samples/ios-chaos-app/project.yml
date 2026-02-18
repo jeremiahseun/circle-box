@@ -1,0 +1,26 @@
+name: CircleBoxChaosApp
+options:
+  deploymentTarget:
+    iOS: "13.0"
+packages:
+  CircleBoxSDK:
+    path: ../../ios/CircleBoxSDK
+targets:
+  CircleBoxChaosApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: App/Sources
+    info:
+      path: App/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.circlebox.chaos
+        SWIFT_VERSION: 5.9
+    dependencies:
+      - package: CircleBoxSDK

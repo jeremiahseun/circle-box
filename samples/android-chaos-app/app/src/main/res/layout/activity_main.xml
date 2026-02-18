@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btnThermal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mock Thermal Spike" />
+
+        <Button
+            android:id="@+id/btnBattery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mock Low Battery" />
+
+        <Button
+            android:id="@+id/btnNetwork"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mock No Internet" />
+
+        <Button
+            android:id="@+id/btnPermission"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mock Permission Change" />
+
+        <Button
+            android:id="@+id/btnDisk"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mock Low Disk" />
+
+        <Button
+            android:id="@+id/btnBreadcrumb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add Breadcrumb" />
+
+        <Button
+            android:id="@+id/btnExport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Export Logs" />
+
+        <Button
+            android:id="@+id/btnCrash"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hard Crash"
+            android:textStyle="bold" />
+    </LinearLayout>
+</ScrollView>
