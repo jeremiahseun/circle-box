@@ -10,13 +10,19 @@ final class CircleBoxCrashHandler {
     private var previousHandler: NSUncaughtExceptionHandler?
     private let onCrash: (String) -> Void
 
-    init(onCrash: @escaping (String) -> Void) {
+    init(
+        onCrash: @escaping (String) -> Void,
+        previousHandler: NSUncaughtExceptionHandler? = nil
+    ) {
         self.onCrash = onCrash
+        self.previousHandler = previousHandler
     }
 
     func install() {
         // Preserve any existing handler so CircleBox remains compatible with other SDKs.
-        previousHandler = NSGetUncaughtExceptionHandler()
+        if previousHandler == nil {
+            previousHandler = NSGetUncaughtExceptionHandler()
+        }
         circleBoxCrashHandlerRef = self
         NSSetUncaughtExceptionHandler(circleBoxExceptionHandler)
     }

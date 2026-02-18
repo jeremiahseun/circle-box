@@ -62,6 +62,12 @@ public class CircleboxFlutterPlugin: NSObject, FlutterPlugin {
             formats.insert(.json)
           case "csv":
             formats.insert(.csv)
+          case "json_gzip":
+            formats.insert(.jsonGzip)
+          case "csv_gzip":
+            formats.insert(.csvGzip)
+          case "summary":
+            formats.insert(.summary)
           default:
             continue
           }

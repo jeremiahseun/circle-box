@@ -22,7 +22,7 @@ public enum CircleBox {
         runtime.breadcrumb(message: message, attrs: attrs)
     }
 
-    /// Exports the latest report as JSON/CSV files and returns their file URLs.
+    /// Exports the latest report in the requested formats and returns file URLs.
     ///
     /// If a pending crash report exists from a previous launch, that report is exported.
     public static func exportLogs(formats: Set<CircleBoxExportFormat> = [.json, .csv]) throws -> [URL] {

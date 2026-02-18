@@ -2,14 +2,25 @@ import Foundation
 
 final class CircleBoxRuntime {
     private let stateQueue = DispatchQueue(label: "com.circlebox.sdk.runtime")
+    private let fileStore: CircleBoxFileStore
+    private let environmentProvider: () -> CircleBoxEnvironment
 
-    private var environment = CircleBoxEnvironment.current()
+    private var environment: CircleBoxEnvironment
     private var config: CircleBoxConfig = .default
     private var ringBuffer: CircleBoxRingBuffer<CircleBoxEvent> = CircleBoxRingBuffer(capacity: 50)
-    private var fileStore = CircleBoxFileStore()
     private var monitors: CircleBoxSystemMonitors?
     private var crashHandler: CircleBoxCrashHandler?
+    private var signalCrashHandler: CircleBoxSignalCrashHandler?
     private var started = false
+
+    init(
+        fileStore: CircleBoxFileStore = CircleBoxFileStore(),
+        environmentProvider: @escaping () -> CircleBoxEnvironment = CircleBoxEnvironment.current
+    ) {
+        self.fileStore = fileStore
+        self.environmentProvider = environmentProvider
+        self.environment = environmentProvider()
+    }
 
     func start(config: CircleBoxConfig) {
         // Startup is idempotent: only the first call wins.
@@ -17,13 +28,14 @@ final class CircleBoxRuntime {
             guard !started else { return false }
             started = true
             self.config = config
-            environment = CircleBoxEnvironment.current()
+            environment = environmentProvider()
             ringBuffer = CircleBoxRingBuffer(capacity: config.bufferCapacity)
-            fileStore = CircleBoxFileStore()
             return true
         }
 
         guard shouldStart else { return }
+
+        recoverPendingFromSignalMarkerIfNeeded()
 
         let monitors = CircleBoxSystemMonitors(config: config, fileStore: fileStore) { [weak self] type, severity, attrs, thread in
             self?.record(type: type, severity: severity, attrs: attrs, thread: thread)
@@ -37,7 +49,15 @@ final class CircleBoxRuntime {
         crashHandler.install()
         self.crashHandler = crashHandler
 
+        if config.enableSignalCrashCapture,
+           let markerPath = fileStore.signalMarkerPathCString(),
+           let signalCrashHandler = CircleBoxSignalCrashHandler(markerPath: markerPath) {
+            signalCrashHandler.install()
+            self.signalCrashHandler = signalCrashHandler
+        }
+
         record(type: "sdk_start", severity: .info, attrs: ["buffer_capacity": String(config.bufferCapacity)], thread: .main)
+        writeCheckpointBestEffort()
     }
 
     func breadcrumb(message: String, attrs: [String: String]) {
@@ -48,12 +68,9 @@ final class CircleBoxRuntime {
 
     func exportLogs(formats: Set<CircleBoxExportFormat>) throws -> [URL] {
         // Pending crash reports (written in a previous process) take precedence.
-        let envelope: CircleBoxEnvelope
-        if let pending = fileStore.readPendingEnvelope() {
-            envelope = pending
-        } else {
-            envelope = snapshotEnvelope()
-        }
+        let pendingEnvelope = fileStore.readPendingEnvelope()
+        let envelope = pendingEnvelope ?? snapshotEnvelope()
+        let exportSource = pendingEnvelope == nil ? "live_snapshot" : "pending_crash"
 
         var urls: [URL] = []
         let orderedFormats = CircleBoxExportFormat.allCases.filter(formats.contains)
@@ -66,6 +83,17 @@ final class CircleBoxRuntime {
             case .csv:
                 let data = CircleBoxSerializer.csvData(from: envelope)
                 urls.append(try fileStore.writeExportData(data, ext: "csv"))
+            case .jsonGzip:
+                let data = try CircleBoxSerializer.jsonData(from: envelope)
+                let compressed = try CircleBoxSerializer.gzipData(data)
+                urls.append(try fileStore.writeExportData(compressed, ext: "json.gz"))
+            case .csvGzip:
+                let data = CircleBoxSerializer.csvData(from: envelope)
+                let compressed = try CircleBoxSerializer.gzipData(data)
+                urls.append(try fileStore.writeExportData(compressed, ext: "csv.gz"))
+            case .summary:
+                let data = try CircleBoxSerializer.summaryData(from: envelope, exportSource: exportSource)
+                urls.append(try fileStore.writeExportData(data, ext: "summary.json"))
             }
         }
 
@@ -80,18 +108,67 @@ final class CircleBoxRuntime {
         try fileStore.clearPendingCrashReport()
     }
 
+    func recoverPendingFromSignalMarkerIfNeeded() {
+        if fileStore.hasPendingCrashReport() {
+            try? fileStore.clearSignalMarker()
+            return
+        }
+
+        guard let marker = fileStore.readSignalMarker() else {
+            return
+        }
+        defer { try? fileStore.clearSignalMarker() }
+
+        let baseEnvelope = fileStore.readCheckpointEnvelope() ?? snapshotEnvelope()
+        let nextSeq = (baseEnvelope.events.last?.seq ?? -1) + 1
+        let crashEvent = CircleBoxEvent(
+            seq: nextSeq,
+            timestampUnixMs: marker.timestampUnixMs,
+            uptimeMs: Self.uptimeMs(),
+            type: "native_exception_prehook",
+            thread: .crash,
+            severity: .fatal,
+            attrs: [
+                "signal": marker.name,
+                "signal_number": String(marker.signal),
+                "details": "signal:\(marker.name)(\(marker.signal))"
+            ]
+        )
+
+        let recoveredEnvelope = CircleBoxEnvelope(
+            schemaVersion: baseEnvelope.schemaVersion,
+            sessionId: baseEnvelope.sessionId,
+            platform: baseEnvelope.platform,
+            appVersion: baseEnvelope.appVersion,
+            buildNumber: baseEnvelope.buildNumber,
+            osVersion: baseEnvelope.osVersion,
+            deviceModel: baseEnvelope.deviceModel,
+            generatedAtUnixMs: Self.nowMs(),
+            events: baseEnvelope.events + [crashEvent]
+        )
+
+        do {
+            try fileStore.writePendingEnvelope(recoveredEnvelope)
+            try? fileStore.clearCheckpointEnvelope()
+        } catch {
+            // Recovery must never interrupt SDK startup.
+        }
+    }
+
     private func handleCrash(details: String) {
         record(
             type: "native_exception_prehook",
             severity: .fatal,
             attrs: ["details": details],
-            thread: .crash
+            thread: .crash,
+            persistCheckpoint: false
         )
 
         do {
             // Keep crash path best-effort and minimal: snapshot + single file write.
             let envelope = snapshotEnvelope()
             try fileStore.writePendingEnvelope(envelope)
+            try? fileStore.clearSignalMarker()
         } catch {
             // Crash path should avoid throwing.
         }
@@ -115,7 +192,8 @@ final class CircleBoxRuntime {
         type: String,
         severity: CircleBoxEventSeverity,
         attrs: [String: String],
-        thread: CircleBoxEventThread
+        thread: CircleBoxEventThread,
+        persistCheckpoint: Bool = true
     ) {
         let activeConfig = stateQueue.sync { config }
         let sanitizedAttrs = CircleBoxSanitizer.sanitize(attrs: attrs, config: activeConfig)
@@ -130,6 +208,18 @@ final class CircleBoxRuntime {
                 severity: severity,
                 attrs: sanitizedAttrs
             )
+        }
+
+        if persistCheckpoint {
+            writeCheckpointBestEffort()
+        }
+    }
+
+    private func writeCheckpointBestEffort() {
+        do {
+            try fileStore.writeCheckpointEnvelope(snapshotEnvelope())
+        } catch {
+            // Checkpoint writes are best-effort and should not affect runtime behavior.
         }
     }
 

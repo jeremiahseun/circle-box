@@ -1,4 +1,13 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#endif
+
+struct CircleBoxSignalMarker: Sendable {
+    let signal: Int32
+    let name: String
+    let timestampUnixMs: Int64
+}
 
 final class CircleBoxFileStore {
     private let fileManager = FileManager.default
@@ -22,6 +31,14 @@ final class CircleBoxFileStore {
         pendingDirectoryURL.appendingPathComponent("latest.circlebox")
     }
 
+    private var checkpointFileURL: URL {
+        pendingDirectoryURL.appendingPathComponent("checkpoint.circlebox")
+    }
+
+    private var signalMarkerFileURL: URL {
+        pendingDirectoryURL.appendingPathComponent("signal.marker")
+    }
+
     func hasPendingCrashReport() -> Bool {
         fileManager.fileExists(atPath: pendingFileURL.path)
     }
@@ -29,6 +46,82 @@ final class CircleBoxFileStore {
     func clearPendingCrashReport() throws {
         if fileManager.fileExists(atPath: pendingFileURL.path) {
             try fileManager.removeItem(at: pendingFileURL)
+        }
+    }
+
+    func readCheckpointEnvelope() -> CircleBoxEnvelope? {
+        guard let data = try? Data(contentsOf: checkpointFileURL) else {
+            return nil
+        }
+        return try? CircleBoxSerializer.decodeEnvelope(from: data)
+    }
+
+    func writeCheckpointEnvelope(_ envelope: CircleBoxEnvelope) throws {
+        let data = try CircleBoxSerializer.jsonData(from: envelope)
+        try ensureDirectories()
+        try atomicWrite(data, to: checkpointFileURL)
+    }
+
+    func clearCheckpointEnvelope() throws {
+        if fileManager.fileExists(atPath: checkpointFileURL.path) {
+            try fileManager.removeItem(at: checkpointFileURL)
+        }
+    }
+
+    func signalMarkerPathCString() -> [CChar]? {
+        let path = signalMarkerFileURL.path
+        let cPath = path.utf8CString
+        #if canImport(Darwin)
+        if cPath.count >= Int(PATH_MAX) {
+            return nil
+        }
+        #endif
+        return Array(cPath)
+    }
+
+    func readSignalMarker() -> CircleBoxSignalMarker? {
+        guard let data = try? Data(contentsOf: signalMarkerFileURL), data.count >= 4 else {
+            return nil
+        }
+
+        var rawSignal: Int32 = 0
+        _ = withUnsafeMutableBytes(of: &rawSignal) { buffer in
+            data.copyBytes(to: buffer, from: 0..<4)
+        }
+        let signal = Int32(littleEndian: rawSignal)
+
+        let timestampUnixMs: Int64
+        if data.count >= 12 {
+            var rawTimestamp: Int64 = 0
+            _ = withUnsafeMutableBytes(of: &rawTimestamp) { buffer in
+                data.copyBytes(to: buffer, from: 4..<12)
+            }
+            timestampUnixMs = Int64(littleEndian: rawTimestamp)
+        } else {
+            timestampUnixMs = Int64(Date().timeIntervalSince1970 * 1000)
+        }
+
+        return CircleBoxSignalMarker(
+            signal: signal,
+            name: Self.signalName(for: signal),
+            timestampUnixMs: timestampUnixMs
+        )
+    }
+
+    func writeSignalMarker(_ marker: CircleBoxSignalMarker) throws {
+        try ensureDirectories()
+
+        var signalLE = marker.signal.littleEndian
+        var timestampLE = marker.timestampUnixMs.littleEndian
+        var data = Data()
+        withUnsafeBytes(of: &signalLE) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: &timestampLE) { data.append(contentsOf: $0) }
+        try atomicWrite(data, to: signalMarkerFileURL)
+    }
+
+    func clearSignalMarker() throws {
+        if fileManager.fileExists(atPath: signalMarkerFileURL.path) {
+            try fileManager.removeItem(at: signalMarkerFileURL)
         }
     }
 
@@ -69,6 +162,25 @@ final class CircleBoxFileStore {
     private func ensureDirectories() throws {
         try fileManager.createDirectory(at: pendingDirectoryURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: exportDirectoryURL, withIntermediateDirectories: true)
+    }
+
+    private static func signalName(for signal: Int32) -> String {
+        switch signal {
+        case SIGABRT:
+            return "SIGABRT"
+        case SIGSEGV:
+            return "SIGSEGV"
+        case SIGBUS:
+            return "SIGBUS"
+        case SIGILL:
+            return "SIGILL"
+        case SIGTRAP:
+            return "SIGTRAP"
+        case SIGFPE:
+            return "SIGFPE"
+        default:
+            return "SIG\(signal)"
+        }
     }
 
     private func atomicWrite(_ data: Data, to destination: URL) throws {

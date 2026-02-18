@@ -29,4 +29,19 @@ class CircleBoxSanitizerTest {
 
         assertEquals("01234567", out["value"])
     }
+
+    @Test
+    fun preservesSafeTelemetryKeysEvenWhenValueLooksSensitive() {
+        val config = CircleBoxConfig(sanitizeAttributes = true)
+        val out = CircleBoxSanitizer.sanitize(
+            mapOf(
+                "available_bytes" to "1234567890123",
+                "custom_value" to "1234567890123"
+            ),
+            config
+        )
+
+        assertEquals("1234567890123", out["available_bytes"])
+        assertEquals("[REDACTED]", out["custom_value"])
+    }
 }

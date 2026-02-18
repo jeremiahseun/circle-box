@@ -36,4 +36,17 @@ final class CircleBoxSanitizerTests: XCTestCase {
 
         XCTAssertEqual(output["email"], "person@example.com")
     }
+
+    func testPreservesSafeTelemetryKeysEvenWhenValueLooksSensitive() {
+        let config = CircleBoxConfig(sanitizeAttributes: true)
+        let attrs = [
+            "available_bytes": "1234567890123",
+            "custom_value": "1234567890123"
+        ]
+
+        let output = CircleBoxSanitizer.sanitize(attrs: attrs, config: config)
+
+        XCTAssertEqual(output["available_bytes"], "1234567890123")
+        XCTAssertEqual(output["custom_value"], "[REDACTED]")
+    }
 }

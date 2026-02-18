@@ -2,6 +2,9 @@
 enum CircleBoxExportFormat {
   json,
   csv,
+  jsonGzip,
+  csvGzip,
+  summary,
 }
 
 extension CircleBoxExportFormatWire on CircleBoxExportFormat {
@@ -12,6 +15,12 @@ extension CircleBoxExportFormatWire on CircleBoxExportFormat {
         return 'json';
       case CircleBoxExportFormat.csv:
         return 'csv';
+      case CircleBoxExportFormat.jsonGzip:
+        return 'json_gzip';
+      case CircleBoxExportFormat.csvGzip:
+        return 'csv_gzip';
+      case CircleBoxExportFormat.summary:
+        return 'summary';
     }
   }
 }

@@ -69,7 +69,9 @@ internal class CircleBoxRuntime(
 
     fun exportLogs(formats: Set<CircleBoxExportFormat>): List<java.io.File> {
         // Pending crash reports (from previous process runs) take precedence.
-        val envelope = fileStore.readPendingEnvelope() ?: snapshotEnvelope()
+        val pendingEnvelope = fileStore.readPendingEnvelope()
+        val envelope = pendingEnvelope ?: snapshotEnvelope()
+        val exportSource = if (pendingEnvelope == null) "live_snapshot" else "pending_crash"
         val exports = ArrayList<java.io.File>()
 
         if (formats.contains(CircleBoxExportFormat.JSON)) {
@@ -77,6 +79,18 @@ internal class CircleBoxRuntime(
         }
         if (formats.contains(CircleBoxExportFormat.CSV)) {
             exports += fileStore.writeExport(CircleBoxSerializer.toCsv(envelope), "csv")
+        }
+        if (formats.contains(CircleBoxExportFormat.JSON_GZIP)) {
+            val raw = CircleBoxSerializer.encodeEnvelope(envelope)
+            exports += fileStore.writeExport(CircleBoxSerializer.gzip(raw), "json.gz")
+        }
+        if (formats.contains(CircleBoxExportFormat.CSV_GZIP)) {
+            val raw = CircleBoxSerializer.toCsv(envelope)
+            exports += fileStore.writeExport(CircleBoxSerializer.gzip(raw), "csv.gz")
+        }
+        if (formats.contains(CircleBoxExportFormat.SUMMARY)) {
+            val summary = CircleBoxSerializer.encodeSummary(envelope, exportSource = exportSource)
+            exports += fileStore.writeExport(summary, "summary.json")
         }
 
         return exports

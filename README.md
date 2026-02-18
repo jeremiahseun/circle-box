@@ -14,8 +14,10 @@ CircleBox records environmental transitions such as memory pressure, thermal cha
 
 - Fixed-size in-memory ring buffer (default: 50 events)
 - Crash pre-hook flush to local `.circlebox` file
+- iOS hard-crash marker capture for signal crashes (`SIGABRT`, `SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGTRAP`, `SIGFPE`)
 - Pending crash report detection on next launch
 - JSON and CSV export APIs
+- Compressed exports (`json_gzip`, `csv_gzip`) and summary export (`summary`)
 - Automatic system signal tracking on iOS and Android
 - Flutter bridge for cross-platform apps
 - Naming guard to enforce `CircleBox` naming consistency
@@ -69,6 +71,7 @@ On uncaught crash paths:
 - `samples/ios-chaos-app` - iOS sample scaffold
 - `samples/android-chaos-app` - Android sample app
 - `docs/schema-v1.md` - schema reference
+- `docs/phase1-closeout.md` - Phase 1 acceptance and sign-off checklist
 - `scripts/check_naming.sh` - naming guard script
 - `.github/workflows` - CI workflows
 
@@ -94,6 +97,12 @@ if CircleBox.hasPendingCrashReport() {
     let files = try CircleBox.exportLogs(formats: [.json, .csv])
     print(files)
 }
+```
+
+Signal crash capture is enabled by default on iOS and can be disabled:
+
+```swift
+CircleBox.start(config: CircleBoxConfig(enableSignalCrashCapture: false))
 ```
 
 ### Android (Kotlin)
@@ -125,10 +134,22 @@ await CircleBox.breadcrumb('User started Checkout', attrs: {'flow': 'checkout'})
 
 if (await CircleBox.hasPendingCrashReport()) {
   final files = await CircleBox.exportLogs(
-    formats: {CircleBoxExportFormat.json, CircleBoxExportFormat.csv},
+    formats: {
+      CircleBoxExportFormat.json,
+      CircleBoxExportFormat.csv,
+      CircleBoxExportFormat.jsonGzip,
+      CircleBoxExportFormat.csvGzip,
+      CircleBoxExportFormat.summary,
+    },
   );
   print(files);
 }
+```
+
+You can increase ring-buffer depth from Flutter:
+
+```dart
+await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
 ```
 
 ## Public API Summary

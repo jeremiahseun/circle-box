@@ -65,4 +65,21 @@ void main() {
     final args = calls.single.arguments as Map<Object?, Object?>;
     expect(args['message'], 'User started Checkout');
   });
+
+  test('exportLogs forwards extended export format names', () async {
+    await CircleBox.exportLogs(
+      formats: {
+        CircleBoxExportFormat.jsonGzip,
+        CircleBoxExportFormat.csvGzip,
+        CircleBoxExportFormat.summary,
+      },
+    );
+
+    expect(calls.single.method, 'exportLogs');
+    final args = calls.single.arguments as Map<Object?, Object?>;
+    final formats = (args['formats'] as List<Object?>).cast<String>().toSet();
+    expect(formats.contains('json_gzip'), true);
+    expect(formats.contains('csv_gzip'), true);
+    expect(formats.contains('summary'), true);
+  });
 }

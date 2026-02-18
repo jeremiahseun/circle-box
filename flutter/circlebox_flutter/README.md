@@ -5,10 +5,18 @@ Flutter bridge for CircleBox native SDKs.
 ## API
 
 ```dart
-await CircleBox.start();
+await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
 await CircleBox.breadcrumb('User started Checkout', attrs: {'flow': 'checkout'});
 final pending = await CircleBox.hasPendingCrashReport();
-final files = await CircleBox.exportLogs(formats: {CircleBoxExportFormat.json, CircleBoxExportFormat.csv});
+final files = await CircleBox.exportLogs(
+  formats: {
+    CircleBoxExportFormat.json,
+    CircleBoxExportFormat.csv,
+    CircleBoxExportFormat.jsonGzip,
+    CircleBoxExportFormat.csvGzip,
+    CircleBoxExportFormat.summary,
+  },
+);
 ```
 
 ## Automatic Flutter Error Hooks

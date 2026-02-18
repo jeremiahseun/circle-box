@@ -2,6 +2,18 @@ import Foundation
 
 /// Sanitizes event attributes before they enter the in-memory ring buffer.
 enum CircleBoxSanitizer {
+    // Operational telemetry keys that are safe to keep for debugging.
+    private static let safeTelemetryKeys: Set<String> = [
+        "available_bytes",
+        "blocked_ms",
+        "threshold_ms",
+        "buffer_capacity",
+        "disk_check_interval_sec",
+        "signal_number",
+        "uptime_ms",
+        "timestamp_unix_ms"
+    ]
+
     private static let emailRegex = try! NSRegularExpression(
         pattern: "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
         options: [.caseInsensitive]
@@ -29,7 +41,7 @@ enum CircleBoxSanitizer {
                 output = String(output.prefix(config.maxAttributeLength))
             }
 
-            if config.sanitizeAttributes && shouldRedact(output) {
+            if config.sanitizeAttributes && shouldRedact(key: key, value: output) {
                 // Redact matched sensitive patterns instead of partially masking.
                 output = "[REDACTED]"
             }
@@ -40,7 +52,11 @@ enum CircleBoxSanitizer {
         return sanitized
     }
 
-    private static func shouldRedact(_ value: String) -> Bool {
+    private static func shouldRedact(key: String, value: String) -> Bool {
+        if safeTelemetryKeys.contains(key.lowercased()) {
+            return false
+        }
+
         let range = NSRange(location: 0, length: value.utf16.count)
         return emailRegex.firstMatch(in: value, options: [], range: range) != nil
             || phoneRegex.firstMatch(in: value, options: [], range: range) != nil

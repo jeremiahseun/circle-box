@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .target(
             name: "CircleBoxSDK",
-            path: "Sources/CircleBoxSDK"
+            path: "Sources/CircleBoxSDK",
+            linkerSettings: [
+                .linkedLibrary("z")
+            ]
         ),
         .testTarget(
             name: "CircleBoxSDKTests",

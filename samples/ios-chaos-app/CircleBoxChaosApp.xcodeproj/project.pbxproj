@@ -3,20 +3,20 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		04C232912F45D86D0024000D /* CircleBoxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C232902F45D86C0024000D /* CircleBoxApp.swift */; };
-		04C232932F45D8750024000D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C232922F45D8750024000D /* ContentView.swift */; };
+		08A245ABF60447D61B5D3504 /* CircleBoxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D228849A4B533801A687646 /* CircleBoxApp.swift */; };
+		33DF759215B027185215959A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13CE4681EB474FB132BE9073 /* ContentView.swift */; };
 		5E3DC90893987B028C30E30A /* CircleBoxSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 0D0B6BF26D7E86C70F29F8AD /* CircleBoxSDK */; };
 		FB81F9003A3F2A2892E45D79 /* ChaosViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC1C7E69C57487A92F4DF51 /* ChaosViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		04C232902F45D86C0024000D /* CircleBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleBoxApp.swift; sourceTree = "<group>"; };
-		04C232922F45D8750024000D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		9848F7EC9CBA866DC7471B7B /* CircleBoxChaosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CircleBoxChaosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13CE4681EB474FB132BE9073 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9848F7EC9CBA866DC7471B7B /* CircleBoxChaosApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CircleBoxChaosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9D228849A4B533801A687646 /* CircleBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleBoxApp.swift; sourceTree = "<group>"; };
 		9FC1C7E69C57487A92F4DF51 /* ChaosViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaosViewController.swift; sourceTree = "<group>"; };
 		EF3791BF3ED7880D4CFF2FB9 /* CircleBoxSDK */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CircleBoxSDK; path = ../../ios/CircleBoxSDK; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -62,8 +62,8 @@
 			isa = PBXGroup;
 			children = (
 				9FC1C7E69C57487A92F4DF51 /* ChaosViewController.swift */,
-				04C232902F45D86C0024000D /* CircleBoxApp.swift */,
-				04C232922F45D8750024000D /* ContentView.swift */,
+				9D228849A4B533801A687646 /* CircleBoxApp.swift */,
+				13CE4681EB474FB132BE9073 /* ContentView.swift */,
 			);
 			name = Sources;
 			path = App/Sources;
@@ -113,6 +113,7 @@
 			packageReferences = (
 				434CA3F2393893A4F0878943 /* XCLocalSwiftPackageReference "../../ios/CircleBoxSDK" */,
 			);
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -126,9 +127,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				04C232932F45D8750024000D /* ContentView.swift in Sources */,
-				04C232912F45D86D0024000D /* CircleBoxApp.swift in Sources */,
 				FB81F9003A3F2A2892E45D79 /* ChaosViewController.swift in Sources */,
+				08A245ABF60447D61B5D3504 /* CircleBoxApp.swift in Sources */,
+				33DF759215B027185215959A /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -180,7 +181,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -197,7 +198,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -215,7 +216,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -278,7 +279,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

@@ -138,9 +138,75 @@ Acceptance criteria:
 - JS-side error hooks are configurable and documented.
 - Native module bridge returns absolute export paths and pending crash state.
 
+### 6) Cross-Platform Schema Parity and Contract Tests
+
+- Enforce identical export field naming and structure across iOS and Android.
+- Standardize on schema v1 field naming (`snake_case`) for envelope and event keys.
+- Prevent platform-specific drift in key names and optional fields over time.
+
+Acceptance criteria:
+
+- iOS and Android exports validate against the same schema contract.
+- CI includes schema parity tests that fail on naming drift.
+- Golden fixtures for iOS and Android are versioned and diff-checked.
+
+### 7) Sanitization Policy Hardening (Key-Aware)
+
+- Move from value-only pattern matching to key-aware redaction policy.
+- Preserve operational diagnostics (for example `available_bytes`, `blocked_ms`, `threshold_ms`) while still redacting true sensitive data.
+- Keep truncation and sanitization configurable per platform.
+
+Acceptance criteria:
+
+- False-positive redactions are reduced on core system metrics.
+- PII-like payloads remain redacted by default.
+- Sanitization unit tests include positive and negative cases for common telemetry keys.
+
+### 8) Crash Context Enrichment
+
+- Enrich crash prehook entries with normalized crash metadata:
+  - exception/throwable type
+  - message
+  - stack summary or stack hash
+  - crash thread and fatality marker
+- Keep payload size bounded for crash-path safety.
+
+Acceptance criteria:
+
+- Pre-crash and crash event sequence is sufficient to identify likely root cause without external logs.
+- Crash metadata fields are consistent across iOS and Android.
+- Crash-path writes remain atomic and within target latency budget.
+
+### 9) Event Noise Suppression and Signal Quality
+
+- Suppress low-value duplicate transitions (for example unchanged connectivity state).
+- Coalesce high-frequency samples when values do not materially change.
+- Improve jank event quality to reduce false positives around lifecycle transitions.
+
+Acceptance criteria:
+
+- Duplicate/no-op event rate drops while preserving meaningful transitions.
+- Developers can reconstruct causal sequence with less manual filtering.
+- Regression tests verify no loss of critical crash-adjacent context.
+
+### 10) Export Provenance and Capture Reason
+
+- Add export metadata indicating source and intent:
+  - `export_source`: `pending_crash | live_snapshot`
+  - `capture_reason`: `uncaught_exception | manual_export | startup_pending_detection`
+- Distinguish crash forensics exports from routine snapshots.
+
+Acceptance criteria:
+
+- Every export has explicit provenance fields.
+- Downstream tooling can filter crash-derived exports without heuristic parsing.
+- Existing JSON/CSV consumers remain backward-compatible through versioned rollout.
+
 ## Phase 3: Cloud + Connectivity Breakthrough (Monetization / Innovation)
 
 Goal: turn local crash context into durable, actionable fleet intelligence.
+
+### Pre-number: I am looking for a way where we can even make the log way better. If possible, knowing which screen, and what was pressed or happened (either in code or by the user), and what was the last thing that happened before the crash, or the error. This is very important for us to debug the issue.
 
 ### 1) Predictive Low-Level Sync
 
@@ -243,6 +309,10 @@ Phase 2 metrics:
 - Reduction in repro time for crash tickets
 - Flutter hook capture rate for uncaught Dart errors
 - React Native bridge adoption and JS exception coverage
+- Cross-platform schema parity pass rate in CI
+- Sanitization false-positive rate on operational metrics
+- Duplicate/no-op event ratio after noise suppression
+- Crash export provenance coverage (`export_source` present)
 
 Phase 3 metrics:
 
@@ -254,5 +324,6 @@ Phase 3 metrics:
 
 - Keep schema versioned from day one.
 - Keep naming consistent (`CircleBox`, `circlebox`, `.circlebox`).
+- Treat schema parity and sanitizer correctness as release gates.
 - Treat offline pipeline as reliability-first, not volume-first.
 - Preserve transparent OSS posture while differentiating with hosted operations quality.

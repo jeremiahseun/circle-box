@@ -13,6 +13,6 @@ open CircleBoxChaosApp.xcodeproj
 ## Flow
 
 1. Tap several mock chaos buttons.
-2. Tap **Hard Crash**.
+2. Tap **Hard Crash** or **Signal Crash (SIGABRT)**.
 3. Re-open app.
 4. Export logs and inspect JSON/CSV ordering.

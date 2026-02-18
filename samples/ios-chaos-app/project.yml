@@ -1,7 +1,7 @@
 name: CircleBoxChaosApp
 options:
   deploymentTarget:
-    iOS: "13.0"
+    iOS: "14.0"
 packages:
   CircleBoxSDK:
     path: ../../ios/CircleBoxSDK
@@ -9,7 +9,7 @@ targets:
   CircleBoxChaosApp:
     type: application
     platform: iOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "14.0"
     sources:
       - path: App/Sources
     info:

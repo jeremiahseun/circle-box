@@ -33,10 +33,14 @@ internal class CircleBoxFileStore(context: Context) {
 
     fun writePendingEnvelope(envelope: CircleBoxEnvelope) {
         ensureDirectories()
-        atomicWrite(pendingFile, CircleBoxSerializer.encodeEnvelope(envelope))
+        atomicWrite(pendingFile, CircleBoxSerializer.encodeEnvelope(envelope).toByteArray(Charsets.UTF_8))
     }
 
     fun writeExport(content: String, ext: String): File {
+        return writeExport(content.toByteArray(Charsets.UTF_8), ext)
+    }
+
+    fun writeExport(content: ByteArray, ext: String): File {
         ensureDirectories()
         val output = File(exportDir, "circlebox-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.$ext")
         atomicWrite(output, content)
@@ -56,12 +60,12 @@ internal class CircleBoxFileStore(context: Context) {
         }
     }
 
-    private fun atomicWrite(destination: File, content: String) {
+    private fun atomicWrite(destination: File, content: ByteArray) {
         val temp = File(destination.parentFile, ".${UUID.randomUUID()}.tmp")
         var shouldCleanupTemp = true
         try {
             FileOutputStream(temp).use { stream ->
-                stream.write(content.toByteArray(Charsets.UTF_8))
+                stream.write(content)
                 stream.fd.sync()
             }
 

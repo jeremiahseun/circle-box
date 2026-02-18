@@ -12,6 +12,8 @@ public struct CircleBoxConfig: Sendable {
     public let maxAttributeLength: Int
     /// Interval for disk-availability sampling events.
     public let diskCheckIntervalSec: TimeInterval
+    /// Enables signal-based crash marker capture for hard crashes (e.g. SIGABRT/SIGSEGV).
+    public let enableSignalCrashCapture: Bool
 
     /// Creates a CircleBox configuration.
     ///
@@ -21,13 +23,15 @@ public struct CircleBoxConfig: Sendable {
         jankThresholdMs: UInt64 = 200,
         sanitizeAttributes: Bool = true,
         maxAttributeLength: Int = 256,
-        diskCheckIntervalSec: TimeInterval = 60
+        diskCheckIntervalSec: TimeInterval = 60,
+        enableSignalCrashCapture: Bool = true
     ) {
         self.bufferCapacity = max(1, bufferCapacity)
         self.jankThresholdMs = max(16, jankThresholdMs)
         self.sanitizeAttributes = sanitizeAttributes
         self.maxAttributeLength = max(16, maxAttributeLength)
         self.diskCheckIntervalSec = max(10, diskCheckIntervalSec)
+        self.enableSignalCrashCapture = enableSignalCrashCapture
     }
 
     /// Production default configuration.
