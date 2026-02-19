@@ -1,0 +1,37 @@
+{
+  "app_version": "1.0",
+  "build_number": "1",
+  "capture_reason": "manual_export",
+  "device_model": "iPhone",
+  "events": [
+    {
+      "attrs": {
+        "buffer_capacity": "200"
+      },
+      "seq": 0,
+      "severity": "info",
+      "thread": "main",
+      "timestamp_unix_ms": 1771490001000,
+      "type": "sdk_start",
+      "uptime_ms": 100
+    },
+    {
+      "attrs": {
+        "flow": "checkout",
+        "message": "User started Checkout"
+      },
+      "seq": 1,
+      "severity": "info",
+      "thread": "main",
+      "timestamp_unix_ms": 1771490002000,
+      "type": "breadcrumb",
+      "uptime_ms": 200
+    }
+  ],
+  "export_source": "live_snapshot",
+  "generated_at_unix_ms": 1771490003000,
+  "os_version": "17.0",
+  "platform": "ios",
+  "schema_version": 2,
+  "session_id": "IOS-SAMPLE-SESSION"
+}

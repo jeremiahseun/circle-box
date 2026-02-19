@@ -31,6 +31,7 @@ private struct CircleBoxSummary: Encodable {
     let schemaVersion: Int
     let generatedAtUnixMs: Int64
     let exportSource: String
+    let captureReason: String
     let sessionId: String
     let platform: String
     let appVersion: String
@@ -51,6 +52,7 @@ private struct CircleBoxSummary: Encodable {
         case schemaVersion = "schema_version"
         case generatedAtUnixMs = "generated_at_unix_ms"
         case exportSource = "export_source"
+        case captureReason = "capture_reason"
         case sessionId = "session_id"
         case platform
         case appVersion = "app_version"
@@ -81,8 +83,20 @@ enum CircleBoxSerializer {
     }
 
     static func csvData(from envelope: CircleBoxEnvelope) -> Data {
-        var lines: [String] = ["seq,timestamp_unix_ms,uptime_ms,type,thread,severity,attrs_json"]
-        lines.reserveCapacity(envelope.events.count + 1)
+        var lines: [String] = [
+            "meta,schema_version,export_source,capture_reason,session_id,platform,generated_at_unix_ms",
+            [
+                "meta",
+                String(envelope.schemaVersion),
+                csvEscape(envelope.exportSource.rawValue),
+                csvEscape(envelope.captureReason.rawValue),
+                csvEscape(envelope.sessionId),
+                csvEscape(envelope.platform),
+                String(envelope.generatedAtUnixMs)
+            ].joined(separator: ","),
+            "seq,timestamp_unix_ms,uptime_ms,type,thread,severity,attrs_json"
+        ]
+        lines.reserveCapacity(envelope.events.count + 3)
 
         let attrsEncoder = JSONEncoder()
 
@@ -134,6 +148,7 @@ enum CircleBoxSerializer {
             schemaVersion: envelope.schemaVersion,
             generatedAtUnixMs: envelope.generatedAtUnixMs,
             exportSource: exportSource,
+            captureReason: envelope.captureReason.rawValue,
             sessionId: envelope.sessionId,
             platform: envelope.platform,
             appVersion: envelope.appVersion,

@@ -23,6 +23,7 @@ private data class CircleBoxSummary(
     @SerialName("schema_version") val schemaVersion: Int,
     @SerialName("generated_at_unix_ms") val generatedAtUnixMs: Long,
     @SerialName("export_source") val exportSource: String,
+    @SerialName("capture_reason") val captureReason: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("platform") val platform: String,
     @SerialName("app_version") val appVersion: String,
@@ -57,7 +58,17 @@ internal object CircleBoxSerializer {
     }
 
     fun toCsv(envelope: CircleBoxEnvelope): String {
-        val lines = ArrayList<String>(envelope.events.size + 1)
+        val lines = ArrayList<String>(envelope.events.size + 3)
+        lines += "meta,schema_version,export_source,capture_reason,session_id,platform,generated_at_unix_ms"
+        lines += listOf(
+            "meta",
+            envelope.schemaVersion.toString(),
+            csvEscape(envelope.exportSource.name.lowercase()),
+            csvEscape(envelope.captureReason.name.lowercase()),
+            csvEscape(envelope.sessionId),
+            csvEscape(envelope.platform),
+            envelope.generatedAtUnixMs.toString()
+        ).joinToString(",")
         lines += "seq,timestamp_unix_ms,uptime_ms,type,thread,severity,attrs_json"
 
         envelope.events.forEach { event ->
@@ -120,6 +131,7 @@ internal object CircleBoxSerializer {
             schemaVersion = envelope.schemaVersion,
             generatedAtUnixMs = envelope.generatedAtUnixMs,
             exportSource = exportSource,
+            captureReason = envelope.captureReason.name.lowercase(),
             sessionId = envelope.sessionId,
             platform = envelope.platform,
             appVersion = envelope.appVersion,

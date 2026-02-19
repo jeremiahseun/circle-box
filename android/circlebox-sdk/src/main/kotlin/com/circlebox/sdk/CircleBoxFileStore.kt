@@ -11,6 +11,7 @@ internal class CircleBoxFileStore(context: Context) {
     private val pendingDir = File(baseDir, "pending")
     private val exportDir = File(baseDir, "exports")
     private val pendingFile = File(pendingDir, "latest.circlebox")
+    private val checkpointFile = File(pendingDir, "checkpoint.circlebox")
 
     init {
         ensureDirectories()
@@ -28,12 +29,32 @@ internal class CircleBoxFileStore(context: Context) {
         if (!pendingFile.exists()) {
             return null
         }
-        return CircleBoxSerializer.decodeEnvelope(pendingFile.readText(Charsets.UTF_8))
+        val bytes = pendingFile.readBytes()
+        return CircleBoxProtobufPersistence.decodeEnvelope(bytes)
     }
 
     fun writePendingEnvelope(envelope: CircleBoxEnvelope) {
         ensureDirectories()
-        atomicWrite(pendingFile, CircleBoxSerializer.encodeEnvelope(envelope).toByteArray(Charsets.UTF_8))
+        atomicWrite(pendingFile, CircleBoxProtobufPersistence.encodeEnvelope(envelope))
+    }
+
+    fun readCheckpointEnvelope(): CircleBoxEnvelope? {
+        if (!checkpointFile.exists()) {
+            return null
+        }
+        val bytes = checkpointFile.readBytes()
+        return CircleBoxProtobufPersistence.decodeEnvelope(bytes)
+    }
+
+    fun writeCheckpointEnvelope(envelope: CircleBoxEnvelope) {
+        ensureDirectories()
+        atomicWrite(checkpointFile, CircleBoxProtobufPersistence.encodeEnvelope(envelope))
+    }
+
+    fun clearCheckpointEnvelope() {
+        if (checkpointFile.exists() && !checkpointFile.delete()) {
+            throw IOException("Unable to delete checkpoint file: ${checkpointFile.absolutePath}")
+        }
     }
 
     fun writeExport(content: String, ext: String): File {

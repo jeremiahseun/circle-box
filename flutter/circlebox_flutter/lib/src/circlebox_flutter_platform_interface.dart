@@ -43,4 +43,9 @@ abstract class CircleBoxFlutterPlatform extends PlatformInterface {
   Future<void> clearPendingCrashReport() {
     throw UnimplementedError('clearPendingCrashReport() has not been implemented.');
   }
+
+  /// Returns a debug snapshot of in-memory ring-buffer events.
+  Future<List<Map<Object?, Object?>>> debugSnapshot({int maxEvents = 200}) {
+    throw UnimplementedError('debugSnapshot() has not been implemented.');
+  }
 }

@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 import 'circlebox_config.dart';
+import 'circlebox_debug_event.dart';
 import 'circlebox_export_format.dart';
 import 'circlebox_flutter_platform_interface.dart';
 
@@ -49,6 +50,14 @@ class CircleBox {
   /// Clears the pending crash report from native storage.
   static Future<void> clearPendingCrashReport() {
     return CircleBoxFlutterPlatform.instance.clearPendingCrashReport();
+  }
+
+  /// Returns a debug snapshot of in-memory events from native ring buffers.
+  ///
+  /// This returns an empty list unless native SDKs are started with `enableDebugViewer`.
+  static Future<List<CircleBoxDebugEvent>> debugSnapshot({int maxEvents = 200}) async {
+    final raw = await CircleBoxFlutterPlatform.instance.debugSnapshot(maxEvents: maxEvents);
+    return raw.map(CircleBoxDebugEvent.fromMap).toList(growable: false);
   }
 
   static void _installFlutterErrorHooks() {

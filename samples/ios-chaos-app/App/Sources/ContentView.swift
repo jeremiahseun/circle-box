@@ -6,6 +6,7 @@ import Darwin
 
 struct ContentView: View {
     @State private var activeAlert: ActiveAlert?
+    @State private var viewerEvents: [CircleBoxEvent] = []
 
     var body: some View {
         NavigationView {
@@ -38,6 +39,10 @@ struct ContentView: View {
                     exportLogs()
                 }
 
+                Button("Open Local Viewer") {
+                    viewerEvents = CircleBox.debugSnapshot(maxEvents: 200)
+                }
+
                 Button("Hard Crash") {
                     preconditionFailure("Intentional crash")
                 }
@@ -47,6 +52,21 @@ struct ContentView: View {
                 }
 
                 Spacer()
+
+                if !viewerEvents.isEmpty {
+                    Text("Viewer Events")
+                        .font(.headline)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(Array(viewerEvents.enumerated()), id: \.offset) { _, event in
+                                Text("#\(event.seq) \(event.type) [\(event.severity.rawValue)] \(event.attrs)")
+                                    .font(.caption)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 220)
+                }
             }
             .padding()
             .navigationBarTitle("CircleBox Chaos", displayMode: .inline)

@@ -69,8 +69,14 @@ final class CircleBoxRuntime {
     func exportLogs(formats: Set<CircleBoxExportFormat>) throws -> [URL] {
         // Pending crash reports (written in a previous process) take precedence.
         let pendingEnvelope = fileStore.readPendingEnvelope()
-        let envelope = pendingEnvelope ?? snapshotEnvelope()
-        let exportSource = pendingEnvelope == nil ? "live_snapshot" : "pending_crash"
+        let contextDefaults: (CircleBoxExportSource, CircleBoxCaptureReason) = pendingEnvelope == nil
+            ? (.liveSnapshot, .manualExport)
+            : (.pendingCrash, .startupPendingDetection)
+        let envelope = normalizedEnvelope(
+            pendingEnvelope ?? snapshotEnvelope(exportSource: .liveSnapshot, captureReason: .manualExport),
+            fallbackExportSource: contextDefaults.0,
+            fallbackCaptureReason: contextDefaults.1
+        )
 
         var urls: [URL] = []
         let orderedFormats = CircleBoxExportFormat.allCases.filter(formats.contains)
@@ -92,7 +98,7 @@ final class CircleBoxRuntime {
                 let compressed = try CircleBoxSerializer.gzipData(data)
                 urls.append(try fileStore.writeExportData(compressed, ext: "csv.gz"))
             case .summary:
-                let data = try CircleBoxSerializer.summaryData(from: envelope, exportSource: exportSource)
+                let data = try CircleBoxSerializer.summaryData(from: envelope, exportSource: envelope.exportSource.rawValue)
                 urls.append(try fileStore.writeExportData(data, ext: "summary.json"))
             }
         }
@@ -106,6 +112,17 @@ final class CircleBoxRuntime {
 
     func clearPendingCrashReport() throws {
         try fileStore.clearPendingCrashReport()
+    }
+
+    func debugSnapshot(maxEvents: Int = 200) -> [CircleBoxEvent] {
+        let localConfig = stateQueue.sync { config }
+        guard localConfig.enableDebugViewer else {
+            return []
+        }
+
+        let events = ringBuffer.snapshot()
+        let clamped = max(1, maxEvents)
+        return Array(events.suffix(clamped))
     }
 
     func recoverPendingFromSignalMarkerIfNeeded() {
@@ -136,13 +153,15 @@ final class CircleBoxRuntime {
         )
 
         let recoveredEnvelope = CircleBoxEnvelope(
-            schemaVersion: baseEnvelope.schemaVersion,
+            schemaVersion: max(baseEnvelope.schemaVersion, 2),
             sessionId: baseEnvelope.sessionId,
             platform: baseEnvelope.platform,
             appVersion: baseEnvelope.appVersion,
             buildNumber: baseEnvelope.buildNumber,
             osVersion: baseEnvelope.osVersion,
             deviceModel: baseEnvelope.deviceModel,
+            exportSource: .pendingCrash,
+            captureReason: .startupPendingDetection,
             generatedAtUnixMs: Self.nowMs(),
             events: baseEnvelope.events + [crashEvent]
         )
@@ -166,7 +185,7 @@ final class CircleBoxRuntime {
 
         do {
             // Keep crash path best-effort and minimal: snapshot + single file write.
-            let envelope = snapshotEnvelope()
+            let envelope = snapshotEnvelope(exportSource: .pendingCrash, captureReason: .uncaughtException)
             try fileStore.writePendingEnvelope(envelope)
             try? fileStore.clearSignalMarker()
         } catch {
@@ -174,7 +193,10 @@ final class CircleBoxRuntime {
         }
     }
 
-    private func snapshotEnvelope() -> CircleBoxEnvelope {
+    private func snapshotEnvelope(
+        exportSource: CircleBoxExportSource = .liveSnapshot,
+        captureReason: CircleBoxCaptureReason = .manualExport
+    ) -> CircleBoxEnvelope {
         let events = ringBuffer.snapshot()
         return CircleBoxEnvelope(
             sessionId: environment.sessionID,
@@ -183,8 +205,33 @@ final class CircleBoxRuntime {
             buildNumber: environment.buildNumber,
             osVersion: environment.osVersion,
             deviceModel: environment.deviceModel,
+            exportSource: exportSource,
+            captureReason: captureReason,
             generatedAtUnixMs: Self.nowMs(),
             events: events
+        )
+    }
+
+    private func normalizedEnvelope(
+        _ envelope: CircleBoxEnvelope,
+        fallbackExportSource: CircleBoxExportSource,
+        fallbackCaptureReason: CircleBoxCaptureReason
+    ) -> CircleBoxEnvelope {
+        let source = envelope.schemaVersion < 2 ? fallbackExportSource : envelope.exportSource
+        let reason = envelope.schemaVersion < 2 ? fallbackCaptureReason : envelope.captureReason
+
+        return CircleBoxEnvelope(
+            schemaVersion: max(envelope.schemaVersion, 2),
+            sessionId: envelope.sessionId,
+            platform: envelope.platform,
+            appVersion: envelope.appVersion,
+            buildNumber: envelope.buildNumber,
+            osVersion: envelope.osVersion,
+            deviceModel: envelope.deviceModel,
+            exportSource: source,
+            captureReason: reason,
+            generatedAtUnixMs: envelope.generatedAtUnixMs,
+            events: envelope.events
         )
     }
 

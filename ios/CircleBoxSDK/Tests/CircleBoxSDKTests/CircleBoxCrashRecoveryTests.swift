@@ -77,6 +77,8 @@ final class CircleBoxCrashRecoveryTests: XCTestCase {
 
         let pending = try XCTUnwrap(store.readPendingEnvelope())
         XCTAssertEqual(pending.events.count, 2)
+        XCTAssertEqual(pending.exportSource, .pendingCrash)
+        XCTAssertEqual(pending.captureReason, .startupPendingDetection)
 
         let crash = try XCTUnwrap(pending.events.last)
         XCTAssertEqual(crash.seq, 8)
@@ -99,6 +101,15 @@ final class CircleBoxCrashRecoveryTests: XCTestCase {
 
         XCTAssertTrue(store.hasPendingCrashReport())
         XCTAssertNil(store.readSignalMarker())
+    }
+
+    func testProtobufPersistenceDecodesLegacyJsonEnvelope() throws {
+        let envelope = makeEnvelope(events: [])
+        let legacyJson = try CircleBoxSerializer.jsonData(from: envelope)
+
+        let decoded = CircleBoxProtobufPersistence.decodeEnvelope(legacyJson)
+        XCTAssertEqual(decoded?.sessionId, envelope.sessionId)
+        XCTAssertEqual(decoded?.schemaVersion, envelope.schemaVersion)
     }
 
     private func makeStore() -> CircleBoxFileStore {

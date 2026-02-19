@@ -1,0 +1,25 @@
+name: Schema Parity
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - 'android/**'
+      - 'docs/fixtures/**'
+      - 'scripts/check_schema_parity.py'
+      - '.github/workflows/schema-parity.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'android/**'
+      - 'docs/fixtures/**'
+      - 'scripts/check_schema_parity.py'
+      - '.github/workflows/schema-parity.yml'
+
+jobs:
+  fixture-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate schema-v2 fixture parity
+        run: python3 scripts/check_schema_parity.py

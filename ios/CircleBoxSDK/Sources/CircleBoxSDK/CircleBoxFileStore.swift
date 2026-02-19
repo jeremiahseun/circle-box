@@ -53,11 +53,11 @@ final class CircleBoxFileStore {
         guard let data = try? Data(contentsOf: checkpointFileURL) else {
             return nil
         }
-        return try? CircleBoxSerializer.decodeEnvelope(from: data)
+        return CircleBoxProtobufPersistence.decodeEnvelope(data)
     }
 
     func writeCheckpointEnvelope(_ envelope: CircleBoxEnvelope) throws {
-        let data = try CircleBoxSerializer.jsonData(from: envelope)
+        let data = try CircleBoxProtobufPersistence.encodeEnvelope(envelope)
         try ensureDirectories()
         try atomicWrite(data, to: checkpointFileURL)
     }
@@ -129,11 +129,11 @@ final class CircleBoxFileStore {
         guard let data = try? Data(contentsOf: pendingFileURL) else {
             return nil
         }
-        return try? CircleBoxSerializer.decodeEnvelope(from: data)
+        return CircleBoxProtobufPersistence.decodeEnvelope(data)
     }
 
     func writePendingEnvelope(_ envelope: CircleBoxEnvelope) throws {
-        let data = try CircleBoxSerializer.jsonData(from: envelope)
+        let data = try CircleBoxProtobufPersistence.encodeEnvelope(envelope)
         try ensureDirectories()
         try atomicWrite(data, to: pendingFileURL)
     }

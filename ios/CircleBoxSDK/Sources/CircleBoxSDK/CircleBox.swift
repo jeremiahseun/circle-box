@@ -38,4 +38,11 @@ public enum CircleBox {
     public static func clearPendingCrashReport() throws {
         try runtime.clearPendingCrashReport()
     }
+
+    /// Returns a debug snapshot of the latest in-memory ring buffer events.
+    ///
+    /// This returns an empty list unless `enableDebugViewer` is enabled in config.
+    public static func debugSnapshot(maxEvents: Int = 200) -> [CircleBoxEvent] {
+        runtime.debugSnapshot(maxEvents: maxEvents)
+    }
 }

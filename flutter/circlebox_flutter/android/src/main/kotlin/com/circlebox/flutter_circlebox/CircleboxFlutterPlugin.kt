@@ -58,6 +58,14 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(null)
                 }
 
+                "debugSnapshot" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val args = call.arguments as? Map<String, Any?>
+                    val maxEvents = (args?.get("maxEvents") as? Number)?.toInt() ?: 200
+                    val events = invokeDebugSnapshot(maxEvents)
+                    result.success(events)
+                }
+
                 else -> result.notImplemented()
             }
         } catch (error: ClassNotFoundException) {
@@ -85,21 +93,46 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         val configClass = Class.forName("com.circlebox.sdk.CircleBoxConfig")
-        val ctor = configClass.getConstructor(
-            Int::class.javaPrimitiveType,
-            Long::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType,
-            Long::class.javaPrimitiveType
-        )
+        val bufferCapacity = (config["bufferCapacity"] as? Number)?.toInt() ?: 50
+        val jankThresholdMs = (config["jankThresholdMs"] as? Number)?.toLong() ?: 200L
+        val sanitizeAttributes = (config["sanitizeAttributes"] as? Boolean) ?: true
+        val maxAttributeLength = (config["maxAttributeLength"] as? Number)?.toInt() ?: 256
+        val diskCheckIntervalSec = (config["diskCheckIntervalSec"] as? Number)?.toLong() ?: 60L
+        val enableDebugViewer = (config["enableDebugViewer"] as? Boolean) ?: false
 
-        val instance = ctor.newInstance(
-            (config["bufferCapacity"] as? Number)?.toInt() ?: 50,
-            (config["jankThresholdMs"] as? Number)?.toLong() ?: 200L,
-            (config["sanitizeAttributes"] as? Boolean) ?: true,
-            (config["maxAttributeLength"] as? Number)?.toInt() ?: 256,
-            (config["diskCheckIntervalSec"] as? Number)?.toLong() ?: 60L
-        )
+        val instance = runCatching {
+            val ctor = configClass.getConstructor(
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType
+            )
+            ctor.newInstance(
+                bufferCapacity,
+                jankThresholdMs,
+                sanitizeAttributes,
+                maxAttributeLength,
+                diskCheckIntervalSec,
+                enableDebugViewer
+            )
+        }.getOrElse {
+            val ctor = configClass.getConstructor(
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType
+            )
+            ctor.newInstance(
+                bufferCapacity,
+                jankThresholdMs,
+                sanitizeAttributes,
+                maxAttributeLength,
+                diskCheckIntervalSec
+            )
+        }
 
         val method = clazz.getMethod("start", configClass)
         method.invoke(null, instance)
@@ -143,6 +176,35 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
         val method = clazz.getMethod("exportLogs", Set::class.java)
         val raw = method.invoke(null, set)
         return mapFiles(raw)
+    }
+
+    private fun invokeDebugSnapshot(maxEvents: Int): List<Map<String, Any?>> {
+        val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        val method = clazz.getMethod("debugSnapshot", Int::class.javaPrimitiveType)
+        val raw = method.invoke(null, maxEvents) as? List<*> ?: return emptyList()
+        return raw.mapNotNull { event ->
+            val instance = event ?: return@mapNotNull null
+            val eventClass = instance.javaClass
+
+            val attrsRaw = runCatching {
+                @Suppress("UNCHECKED_CAST")
+                eventClass.getMethod("getAttrs").invoke(instance) as? Map<Any?, Any?>
+            }.getOrNull() ?: emptyMap()
+            val attrs = LinkedHashMap<String, String>(attrsRaw.size)
+            attrsRaw.forEach { (key, value) ->
+                attrs[key.toString()] = value?.toString() ?: ""
+            }
+
+            linkedMapOf(
+                "seq" to runCatching { eventClass.getMethod("getSeq").invoke(instance) as? Number }.getOrNull()?.toLong(),
+                "timestamp_unix_ms" to runCatching { eventClass.getMethod("getTimestampUnixMs").invoke(instance) as? Number }.getOrNull()?.toLong(),
+                "uptime_ms" to runCatching { eventClass.getMethod("getUptimeMs").invoke(instance) as? Number }.getOrNull()?.toLong(),
+                "type" to runCatching { eventClass.getMethod("getType").invoke(instance)?.toString() }.getOrNull(),
+                "thread" to runCatching { eventClass.getMethod("getThread").invoke(instance)?.toString()?.lowercase() }.getOrNull(),
+                "severity" to runCatching { eventClass.getMethod("getSeverity").invoke(instance)?.toString()?.lowercase() }.getOrNull(),
+                "attrs" to attrs
+            )
+        }
     }
 
     private fun mapFiles(raw: Any?): List<String> {

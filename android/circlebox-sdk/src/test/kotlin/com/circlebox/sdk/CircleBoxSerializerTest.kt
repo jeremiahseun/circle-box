@@ -45,6 +45,8 @@ class CircleBoxSerializerTest {
         val json = Json.parseToJsonElement(summary).jsonObject
 
         assertEquals("pending_crash", json["export_source"]?.jsonPrimitive?.content)
+        assertEquals("manual_export", json["capture_reason"]?.jsonPrimitive?.content)
+        assertEquals("2", json["schema_version"]?.jsonPrimitive?.content)
         assertEquals(2, json["total_events"]?.jsonPrimitive?.content?.toInt())
         assertEquals(true, json["crash_event_present"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -60,5 +62,26 @@ class CircleBoxSerializerTest {
 
         val restored = GZIPInputStream(compressed.inputStream()).bufferedReader().use { it.readText() }
         assertEquals(raw, restored)
+    }
+
+    @Test
+    fun csvIncludesMetadataHeader() {
+        val envelope = CircleBoxEnvelope(
+            sessionId = "s1",
+            platform = "android",
+            appVersion = "1.0",
+            buildNumber = "1",
+            osVersion = "14",
+            deviceModel = "Pixel",
+            exportSource = CircleBoxExportSource.PENDING_CRASH,
+            captureReason = CircleBoxCaptureReason.UNCAUGHT_EXCEPTION,
+            generatedAtUnixMs = 2000,
+            events = emptyList()
+        )
+
+        val csv = CircleBoxSerializer.toCsv(envelope)
+        assertTrue(csv.contains("meta,schema_version,export_source,capture_reason"))
+        assertTrue(csv.contains("pending_crash"))
+        assertTrue(csv.contains("uncaught_exception"))
     }
 }

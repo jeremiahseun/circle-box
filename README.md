@@ -18,8 +18,12 @@ CircleBox records environmental transitions such as memory pressure, thermal cha
 - Pending crash report detection on next launch
 - JSON and CSV export APIs
 - Compressed exports (`json_gzip`, `csv_gzip`) and summary export (`summary`)
+- Schema v2 canonical export format (snake_case + provenance fields)
 - Automatic system signal tracking on iOS and Android
-- Flutter bridge for cross-platform apps
+- Binary pending/checkpoint persistence with legacy JSON fallback
+- Flutter bridge and chaos sample app
+- React Native bridge (bare + Expo prebuild) with automatic JS error hooks
+- Companion Sentry/PostHog adapters for iOS, Android, and Flutter
 - Naming guard to enforce `CircleBox` naming consistency
 
 ## Signals Captured
@@ -68,11 +72,21 @@ On uncaught crash paths:
 - `ios/CircleBoxSDK` - Swift Package implementation
 - `android/circlebox-sdk` - Android/Kotlin library implementation
 - `flutter/circlebox_flutter` - Flutter bridge plugin
+- `flutter/circlebox_adapters` - Flutter companion adapters for Sentry/PostHog forwarding
+- `react-native/circlebox-react-native` - React Native bridge package
+- `integrations/ios/CircleBoxIntegrations` - iOS companion adapters
+- `integrations/android/circlebox-integrations` - Android companion adapters
 - `samples/ios-chaos-app` - iOS sample scaffold
 - `samples/android-chaos-app` - Android sample app
-- `docs/schema-v1.md` - schema reference
+- `samples/flutter_chaos_app` - Flutter chaos validator app
+- `samples/react-native-chaos-app` - React Native (Expo prebuild) chaos sample
+- `docs/schema-v1.md` - legacy schema reference
+- `docs/schema-v2.md` - canonical schema reference
+- `docs/integrations.md` - adapter and forwarding integration guide
 - `docs/phase1-closeout.md` - Phase 1 acceptance and sign-off checklist
 - `scripts/check_naming.sh` - naming guard script
+- `scripts/check_schema_parity.py` - fixture parity contract checker
+- `scripts/decode_persistence.py` - pending/checkpoint decoder utility
 - `.github/workflows` - CI workflows
 
 ## Platform Support
@@ -80,6 +94,7 @@ On uncaught crash paths:
 - iOS 13+
 - Android API 23+
 - Flutter 3.22+ for bridge package
+- React Native 0.73+ (bare or Expo prebuild) for RN bridge package
 
 ## Quick Start
 
@@ -152,6 +167,27 @@ You can increase ring-buffer depth from Flutter:
 await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
 ```
 
+### React Native
+
+Use the React Native bridge package:
+
+```ts
+import { CircleBox } from 'circlebox-react-native';
+
+await CircleBox.start({
+  bufferCapacity: 200,
+  enableDebugViewer: true,
+  installReactNativeErrorHooks: true,
+});
+
+await CircleBox.breadcrumb('User started Checkout', { flow: 'checkout' });
+
+if (await CircleBox.hasPendingCrashReport()) {
+  const files = await CircleBox.exportLogs(['json', 'csv', 'summary']);
+  console.log(files);
+}
+```
+
 ## Public API Summary
 
 ### iOS
@@ -178,18 +214,27 @@ await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
 - `CircleBox.hasPendingCrashReport() -> bool`
 - `CircleBox.clearPendingCrashReport()`
 
+### React Native
+
+- `CircleBox.start(config?)`
+- `CircleBox.breadcrumb(message, attrs?)`
+- `CircleBox.exportLogs(formats?) -> Promise<string[]>`
+- `CircleBox.hasPendingCrashReport() -> Promise<boolean>`
+- `CircleBox.clearPendingCrashReport() -> Promise<void>`
+
 ## Export Schema
 
-See `docs/schema-v1.md` for complete details.
+See `docs/schema-v2.md` for canonical schema details and `docs/schema-v1.md` for legacy reference.
 
 Key fields:
 
-- Envelope: `schema_version`, `session_id`, `platform`, app/device metadata, `events[]`
+- Envelope: `schema_version`, `session_id`, `platform`, app/device metadata, `export_source`, `capture_reason`, `events[]`
 - Event: `seq`, `timestamp_unix_ms`, `uptime_ms`, `type`, `thread`, `severity`, `attrs`
 
 CSV columns:
 
-- `seq,timestamp_unix_ms,uptime_ms,type,thread,severity,attrs_json`
+- Metadata row: `meta,schema_version,export_source,capture_reason,session_id,platform,generated_at_unix_ms`
+- Event row: `seq,timestamp_unix_ms,uptime_ms,type,thread,severity,attrs_json`
 
 ## Chaos Test Apps
 
@@ -239,6 +284,14 @@ flutter analyze
 flutter test
 ```
 
+### Flutter Adapters
+
+```bash
+cd flutter/circlebox_adapters
+flutter analyze
+flutter test
+```
+
 ### Android
 
 If `gradle` is installed:
@@ -249,12 +302,26 @@ gradle test
 gradle assembleRelease
 ```
 
+### Schema Fixture Parity
+
+```bash
+python3 scripts/check_schema_parity.py
+```
+
+### Decode Pending/Checkpoint Files
+
+```bash
+python3 scripts/decode_persistence.py /absolute/path/to/latest.circlebox
+```
+
 ## CI Workflows
 
 - `naming.yml` - naming policy enforcement
 - `ios.yml` - Swift build/test + artifact upload
 - `android.yml` - Gradle test/release assemble + AAR upload
-- `flutter.yml` - Flutter analyze/test + plugin artifact upload
+- `flutter.yml` - Flutter plugin + adapters + chaos sample analyze/tests
+- `react-native.yml` - React Native bridge and sample typecheck
+- `schema-parity.yml` - schema-v2 fixture contract checks
 
 ## Privacy and Safety Defaults
 

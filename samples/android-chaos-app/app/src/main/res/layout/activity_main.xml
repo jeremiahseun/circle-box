@@ -52,6 +52,12 @@
             android:text="Export Logs" />
 
         <Button
+            android:id="@+id/btnViewer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Open Local Viewer" />
+
+        <Button
             android:id="@+id/btnCrash"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

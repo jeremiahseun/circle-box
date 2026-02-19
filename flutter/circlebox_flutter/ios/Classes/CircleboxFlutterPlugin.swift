@@ -23,7 +23,8 @@ public class CircleboxFlutterPlugin: NSObject, FlutterPlugin {
         jankThresholdMs: UInt64(args["jankThresholdMs"] as? Int ?? 200),
         sanitizeAttributes: args["sanitizeAttributes"] as? Bool ?? true,
         maxAttributeLength: args["maxAttributeLength"] as? Int ?? 256,
-        diskCheckIntervalSec: args["diskCheckIntervalSec"] as? TimeInterval ?? 60
+        diskCheckIntervalSec: args["diskCheckIntervalSec"] as? TimeInterval ?? 60,
+        enableDebugViewer: args["enableDebugViewer"] as? Bool ?? false
       )
       CircleBox.start(config: config)
       result(nil)
@@ -102,6 +103,26 @@ public class CircleboxFlutterPlugin: NSObject, FlutterPlugin {
       }
       #else
       result(FlutterError(code: "missing_native_sdk", message: "CircleBoxSDK is not linked in the iOS host app", details: nil))
+      #endif
+
+    case "debugSnapshot":
+      #if canImport(CircleBoxSDK)
+      let args = call.arguments as? [String: Any] ?? [:]
+      let maxEvents = args["maxEvents"] as? Int ?? 200
+      let events = CircleBox.debugSnapshot(maxEvents: maxEvents).map { event in
+        [
+          "seq": event.seq,
+          "timestamp_unix_ms": event.timestampUnixMs,
+          "uptime_ms": event.uptimeMs,
+          "type": event.type,
+          "thread": event.thread.rawValue,
+          "severity": event.severity.rawValue,
+          "attrs": event.attrs
+        ] as [String: Any]
+      }
+      result(events)
+      #else
+      result([])
       #endif
 
     default:

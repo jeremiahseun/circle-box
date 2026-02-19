@@ -81,6 +81,16 @@ object CircleBox {
         runtime().clearPendingCrashReport()
     }
 
+    /**
+     * Returns a debug snapshot of the latest in-memory ring buffer events.
+     *
+     * This returns an empty list unless `enableDebugViewer` is enabled in config.
+     */
+    @JvmStatic
+    fun debugSnapshot(maxEvents: Int = 200): List<CircleBoxEvent> {
+        return runtime().debugSnapshot(maxEvents)
+    }
+
     private fun runtime(): CircleBoxRuntime {
         runtime?.let { return it }
 

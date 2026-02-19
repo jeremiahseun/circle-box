@@ -1,122 +1,371 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+
+import 'package:circlebox_flutter/circlebox_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CircleBox.start(
+    config: const CircleBoxConfig(
+      bufferCapacity: 200,
+      enableDebugViewer: true,
+      installFlutterErrorHooks: true,
+      captureSilentFlutterErrors: false,
+      captureCurrentIsolateErrors: true,
+    ),
+  );
+  runApp(const ChaosApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ChaosApp extends StatelessWidget {
+  const ChaosApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'CircleBox Flutter Chaos',
+      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      home: const ChaosHomeScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class ChaosHomeScreen extends StatefulWidget {
+  const ChaosHomeScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ChaosHomeScreen> createState() => _ChaosHomeScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
+  final Set<CircleBoxExportFormat> _selectedFormats = {
+    CircleBoxExportFormat.json,
+    CircleBoxExportFormat.csv,
+    CircleBoxExportFormat.jsonGzip,
+    CircleBoxExportFormat.csvGzip,
+    CircleBoxExportFormat.summary,
+  };
 
-  void _incrementCounter() {
+  List<_ExportItem> _exports = const [];
+  List<CircleBoxDebugEvent> _debugEvents = const [];
+  String? _statusMessage;
+  bool _pendingDialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPendingReport();
+  }
+
+  Future<void> _checkPendingReport() async {
+    final pending = await CircleBox.hasPendingCrashReport();
+    if (!mounted || !pending || _pendingDialogShown) {
+      return;
+    }
+    _pendingDialogShown = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Crash Report Found'),
+            content: const Text('A pending crash report exists. Export now?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _exportLogs();
+                },
+                child: const Text('Export'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _exportLogs() async {
+    try {
+      final files = await CircleBox.exportLogs(formats: _selectedFormats);
+      final items = await Future.wait(files.map(_ExportItem.fromPath));
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _exports = items;
+        _statusMessage = 'Exported ${items.length} file(s)';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = 'Export failed: $error';
+      });
+    }
+  }
+
+  Future<void> _loadViewer() async {
+    final events = await CircleBox.debugSnapshot(maxEvents: 200);
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _debugEvents = events;
+      _statusMessage = 'Loaded ${events.length} debug event(s)';
+    });
+  }
+
+  Future<void> _mock(String message, Map<String, String> attrs) {
+    return CircleBox.breadcrumb(message, attrs: attrs);
+  }
+
+  Future<void> _triggerFrameworkError() async {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: StateError('CircleBox framework test exception'),
+        stack: StackTrace.current,
+        context: ErrorDescription('Chaos button'),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _statusMessage = 'Framework error reported';
+    });
+  }
+
+  Future<void> _triggerAsyncError() async {
+    Future<void>.delayed(const Duration(milliseconds: 10), () {
+      throw StateError('CircleBox async unhandled test exception');
+    });
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _statusMessage = 'Scheduled async unhandled error';
+    });
+  }
+
+  Future<void> _triggerIsolateError() async {
+    final receivePort = ReceivePort();
+    await Isolate.spawn<_IsolateErrorPayload>(
+      _isolateThrower,
+      _IsolateErrorPayload(receivePort.sendPort),
+      errorsAreFatal: false,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _statusMessage = 'Spawned isolate error';
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      appBar: AppBar(title: const Text('CircleBox Flutter Chaos')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _ActionSection(
+            title: 'Mock Context',
+            children: [
+              _ActionButton(
+                title: 'Mock Thermal Spike',
+                onPressed: () => _mock('Mock thermal spike', {'state': 'critical'}),
+              ),
+              _ActionButton(
+                title: 'Mock Low Battery',
+                onPressed: () => _mock('Mock low battery', {'percent': '7', 'low_power_mode': 'true'}),
+              ),
+              _ActionButton(
+                title: 'Mock No Internet',
+                onPressed: () => _mock('Mock no internet', {'to': 'none'}),
+              ),
+              _ActionButton(
+                title: 'Mock Permission Revoked',
+                onPressed: () => _mock('Mock permission revoked', {'permission': 'camera', 'to': 'denied'}),
+              ),
+              _ActionButton(
+                title: 'Mock Low Disk',
+                onPressed: () => _mock('Mock low disk', {'available_bytes': '1024'}),
+              ),
+              _ActionButton(
+                title: 'Add Breadcrumb',
+                onPressed: () => _mock('User started Checkout', {'flow': 'checkout'}),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ActionSection(
+            title: 'Flutter Error Triggers',
+            children: [
+              _ActionButton(title: 'Framework Error', onPressed: _triggerFrameworkError),
+              _ActionButton(title: 'Async Unhandled Error', onPressed: _triggerAsyncError),
+              _ActionButton(title: 'Isolate Unhandled Error', onPressed: _triggerIsolateError),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ActionSection(
+            title: 'Exports',
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: CircleBoxExportFormat.values.map((format) {
+                  final selected = _selectedFormats.contains(format);
+                  return FilterChip(
+                    label: Text(_formatLabel(format)),
+                    selected: selected,
+                    onSelected: (value) {
+                      setState(() {
+                        if (value) {
+                          _selectedFormats.add(format);
+                        } else {
+                          _selectedFormats.remove(format);
+                        }
+                      });
+                    },
+                  );
+                }).toList(growable: false),
+              ),
+              const SizedBox(height: 12),
+              _ActionButton(title: 'Export Logs', onPressed: _exportLogs),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ActionSection(
+            title: 'Local Viewer',
+            children: [
+              _ActionButton(title: 'Load Viewer Snapshot', onPressed: _loadViewer),
+            ],
+          ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(_statusMessage!, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (_exports.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Exported Files', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ..._exports.map((item) => SelectableText('${item.path} (${item.sizeBytes} bytes)')),
+          ],
+          if (_debugEvents.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Viewer Events', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ..._debugEvents.map(
+              (event) => Card(
+                child: ListTile(
+                  dense: true,
+                  title: Text('#${event.seq} ${event.type} (${event.severity})'),
+                  subtitle: Text('thread=${event.thread} attrs=${event.attrs}'),
+                ),
+              ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatLabel(CircleBoxExportFormat format) {
+    switch (format) {
+      case CircleBoxExportFormat.json:
+        return 'json';
+      case CircleBoxExportFormat.csv:
+        return 'csv';
+      case CircleBoxExportFormat.jsonGzip:
+        return 'json_gzip';
+      case CircleBoxExportFormat.csvGzip:
+        return 'csv_gzip';
+      case CircleBoxExportFormat.summary:
+        return 'summary';
+    }
+  }
+}
+
+class _ActionSection extends StatelessWidget {
+  const _ActionSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ...children,
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({required this.title, required this.onPressed});
+
+  final String title;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: () {
+            unawaited(onPressed());
+          },
+          child: Text(title),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportItem {
+  const _ExportItem({required this.path, required this.sizeBytes});
+
+  final String path;
+  final int sizeBytes;
+
+  static Future<_ExportItem> fromPath(String path) async {
+    if (kIsWeb) {
+      return _ExportItem(path: path, sizeBytes: 0);
+    }
+    final file = File(path);
+    final size = await file.length();
+    return _ExportItem(path: path, sizeBytes: size);
+  }
+}
+
+class _IsolateErrorPayload {
+  const _IsolateErrorPayload(this.sendPort);
+
+  final SendPort sendPort;
+}
+
+void _isolateThrower(_IsolateErrorPayload payload) {
+  payload.sendPort.send('starting');
+  throw StateError('CircleBox isolate test exception');
 }

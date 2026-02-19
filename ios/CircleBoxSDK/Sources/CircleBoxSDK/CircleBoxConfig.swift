@@ -14,6 +14,8 @@ public struct CircleBoxConfig: Sendable {
     public let diskCheckIntervalSec: TimeInterval
     /// Enables signal-based crash marker capture for hard crashes (e.g. SIGABRT/SIGSEGV).
     public let enableSignalCrashCapture: Bool
+    /// Enables debug-only viewer access to current in-memory ring buffer events.
+    public let enableDebugViewer: Bool
 
     /// Creates a CircleBox configuration.
     ///
@@ -24,7 +26,8 @@ public struct CircleBoxConfig: Sendable {
         sanitizeAttributes: Bool = true,
         maxAttributeLength: Int = 256,
         diskCheckIntervalSec: TimeInterval = 60,
-        enableSignalCrashCapture: Bool = true
+        enableSignalCrashCapture: Bool = true,
+        enableDebugViewer: Bool = false
     ) {
         self.bufferCapacity = max(1, bufferCapacity)
         self.jankThresholdMs = max(16, jankThresholdMs)
@@ -32,6 +35,7 @@ public struct CircleBoxConfig: Sendable {
         self.maxAttributeLength = max(16, maxAttributeLength)
         self.diskCheckIntervalSec = max(10, diskCheckIntervalSec)
         self.enableSignalCrashCapture = enableSignalCrashCapture
+        self.enableDebugViewer = enableDebugViewer
     }
 
     /// Production default configuration.

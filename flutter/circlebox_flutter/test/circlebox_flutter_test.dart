@@ -19,6 +19,18 @@ void main() {
           return false;
         case 'exportLogs':
           return <String>[];
+        case 'debugSnapshot':
+          return <Map<String, Object?>>[
+            {
+              'seq': 9,
+              'timestamp_unix_ms': 1234,
+              'uptime_ms': 567,
+              'type': 'breadcrumb',
+              'thread': 'main',
+              'severity': 'info',
+              'attrs': {'message': 'hello'}
+            }
+          ];
         default:
           return null;
       }
@@ -40,6 +52,7 @@ void main() {
     expect(args['installFlutterErrorHooks'], true);
     expect(args['captureSilentFlutterErrors'], false);
     expect(args['captureCurrentIsolateErrors'], true);
+    expect(args['enableDebugViewer'], false);
   });
 
   test('start forwards flutter hook config overrides', () async {
@@ -48,6 +61,7 @@ void main() {
         installFlutterErrorHooks: false,
         captureSilentFlutterErrors: true,
         captureCurrentIsolateErrors: false,
+        enableDebugViewer: true,
       ),
     );
 
@@ -56,6 +70,7 @@ void main() {
     expect(args['installFlutterErrorHooks'], false);
     expect(args['captureSilentFlutterErrors'], true);
     expect(args['captureCurrentIsolateErrors'], false);
+    expect(args['enableDebugViewer'], true);
   });
 
   test('breadcrumb forwards message and attrs', () async {
@@ -81,5 +96,18 @@ void main() {
     expect(formats.contains('json_gzip'), true);
     expect(formats.contains('csv_gzip'), true);
     expect(formats.contains('summary'), true);
+  });
+
+  test('debugSnapshot returns parsed debug events', () async {
+    final events = await CircleBox.debugSnapshot(maxEvents: 50);
+
+    expect(calls.single.method, 'debugSnapshot');
+    final args = calls.single.arguments as Map<Object?, Object?>;
+    expect(args['maxEvents'], 50);
+
+    expect(events.length, 1);
+    expect(events.first.seq, 9);
+    expect(events.first.type, 'breadcrumb');
+    expect(events.first.attrs['message'], 'hello');
   });
 }

@@ -16,3 +16,4 @@ open CircleBoxChaosApp.xcodeproj
 2. Tap **Hard Crash** or **Signal Crash (SIGABRT)**.
 3. Re-open app.
 4. Export logs and inspect JSON/CSV ordering.
+5. Tap **Open Local Viewer** to inspect in-memory timeline events.

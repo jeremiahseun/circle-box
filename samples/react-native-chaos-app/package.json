@@ -1,0 +1,22 @@
+{
+  "name": "react-native-chaos-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "circlebox-react-native": "file:../../react-native/circlebox-react-native",
+    "expo": "^53.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.66",
+    "typescript": "^5.6.3"
+  }
+}

@@ -6,13 +6,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.circlebox.sdk.CircleBox
+import com.circlebox.sdk.CircleBoxConfig
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        CircleBox.start()
+        CircleBox.start(CircleBoxConfig(enableDebugViewer = true))
 
         findViewById<Button>(R.id.btnThermal).setOnClickListener {
             CircleBox.breadcrumb("Mock thermal spike", mapOf("state" to "critical"))
@@ -41,6 +42,22 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnExport).setOnClickListener {
             val files = CircleBox.exportLogs()
             Toast.makeText(this, "Exported ${files.size} file(s)", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btnViewer).setOnClickListener {
+            val events = CircleBox.debugSnapshot(200)
+            val body = if (events.isEmpty()) {
+                "No events captured (enableDebugViewer=false or empty buffer)"
+            } else {
+                events.joinToString("\n") { event ->
+                    "#${event.seq} ${event.type} [${event.severity.name.lowercase()}] ${event.attrs}"
+                }
+            }
+            AlertDialog.Builder(this)
+                .setTitle("CircleBox Viewer")
+                .setMessage(body)
+                .setPositiveButton("Close", null)
+                .show()
         }
 
         findViewById<Button>(R.id.btnCrash).setOnClickListener {

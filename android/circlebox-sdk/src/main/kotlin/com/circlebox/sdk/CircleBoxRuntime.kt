@@ -54,6 +54,7 @@ internal class CircleBoxRuntime(
             attrs = mapOf("buffer_capacity" to config.bufferCapacity.toString()),
             thread = CircleBoxEventThread.MAIN
         )
+        writeCheckpointBestEffort()
     }
 
     fun breadcrumb(message: String, attrs: Map<String, String>) {
@@ -70,8 +71,14 @@ internal class CircleBoxRuntime(
     fun exportLogs(formats: Set<CircleBoxExportFormat>): List<java.io.File> {
         // Pending crash reports (from previous process runs) take precedence.
         val pendingEnvelope = fileStore.readPendingEnvelope()
-        val envelope = pendingEnvelope ?: snapshotEnvelope()
-        val exportSource = if (pendingEnvelope == null) "live_snapshot" else "pending_crash"
+        val envelope = normalizeEnvelope(
+            pendingEnvelope ?: snapshotEnvelope(
+                exportSource = CircleBoxExportSource.LIVE_SNAPSHOT,
+                captureReason = CircleBoxCaptureReason.MANUAL_EXPORT
+            ),
+            fallbackExportSource = if (pendingEnvelope == null) CircleBoxExportSource.LIVE_SNAPSHOT else CircleBoxExportSource.PENDING_CRASH,
+            fallbackCaptureReason = if (pendingEnvelope == null) CircleBoxCaptureReason.MANUAL_EXPORT else CircleBoxCaptureReason.STARTUP_PENDING_DETECTION
+        )
         val exports = ArrayList<java.io.File>()
 
         if (formats.contains(CircleBoxExportFormat.JSON)) {
@@ -89,7 +96,7 @@ internal class CircleBoxRuntime(
             exports += fileStore.writeExport(CircleBoxSerializer.gzip(raw), "csv.gz")
         }
         if (formats.contains(CircleBoxExportFormat.SUMMARY)) {
-            val summary = CircleBoxSerializer.encodeSummary(envelope, exportSource = exportSource)
+            val summary = CircleBoxSerializer.encodeSummary(envelope, exportSource = envelope.exportSource.name.lowercase())
             exports += fileStore.writeExport(summary, "summary.json")
         }
 
@@ -102,6 +109,17 @@ internal class CircleBoxRuntime(
         fileStore.clearPendingCrashReport()
     }
 
+    fun debugSnapshot(maxEvents: Int): List<CircleBoxEvent> {
+        val localConfig = synchronized(lock) { config }
+        if (!localConfig.enableDebugViewer) {
+            return emptyList()
+        }
+
+        val events = ringBuffer.snapshot()
+        val clamped = maxOf(1, maxEvents)
+        return events.takeLast(clamped)
+    }
+
     private fun handleCrash(thread: Thread, throwable: Throwable) {
         record(
             type = "native_exception_prehook",
@@ -111,16 +129,25 @@ internal class CircleBoxRuntime(
                 "throwable" to throwable.javaClass.name,
                 "message" to (throwable.message ?: "unknown")
             ),
-            thread = CircleBoxEventThread.CRASH
+            thread = CircleBoxEventThread.CRASH,
+            persistCheckpoint = false
         )
 
         runCatching {
             // Keep crash path best-effort and minimal.
-            fileStore.writePendingEnvelope(snapshotEnvelope())
+            fileStore.writePendingEnvelope(
+                snapshotEnvelope(
+                    exportSource = CircleBoxExportSource.PENDING_CRASH,
+                    captureReason = CircleBoxCaptureReason.UNCAUGHT_EXCEPTION
+                )
+            )
         }
     }
 
-    private fun snapshotEnvelope(): CircleBoxEnvelope {
+    private fun snapshotEnvelope(
+        exportSource: CircleBoxExportSource = CircleBoxExportSource.LIVE_SNAPSHOT,
+        captureReason: CircleBoxCaptureReason = CircleBoxCaptureReason.MANUAL_EXPORT
+    ): CircleBoxEnvelope {
         val env = environment
         return CircleBoxEnvelope(
             sessionId = env.sessionId,
@@ -129,8 +156,25 @@ internal class CircleBoxRuntime(
             buildNumber = env.buildNumber,
             osVersion = env.osVersion,
             deviceModel = env.deviceModel,
+            exportSource = exportSource,
+            captureReason = captureReason,
             generatedAtUnixMs = nowMs(),
             events = ringBuffer.snapshot()
+        )
+    }
+
+    private fun normalizeEnvelope(
+        envelope: CircleBoxEnvelope,
+        fallbackExportSource: CircleBoxExportSource,
+        fallbackCaptureReason: CircleBoxCaptureReason
+    ): CircleBoxEnvelope {
+        val source = if (envelope.schemaVersion < 2) fallbackExportSource else envelope.exportSource
+        val reason = if (envelope.schemaVersion < 2) fallbackCaptureReason else envelope.captureReason
+
+        return envelope.copy(
+            schemaVersion = maxOf(2, envelope.schemaVersion),
+            exportSource = source,
+            captureReason = reason
         )
     }
 
@@ -138,7 +182,8 @@ internal class CircleBoxRuntime(
         type: String,
         severity: CircleBoxEventSeverity,
         attrs: Map<String, String>,
-        thread: CircleBoxEventThread
+        thread: CircleBoxEventThread,
+        persistCheckpoint: Boolean = true
     ) {
         val localConfig = synchronized(lock) { config }
         val sanitized = CircleBoxSanitizer.sanitize(attrs, localConfig)
@@ -154,6 +199,14 @@ internal class CircleBoxRuntime(
                 attrs = sanitized
             )
         }
+
+        if (persistCheckpoint) {
+            writeCheckpointBestEffort()
+        }
+    }
+
+    private fun writeCheckpointBestEffort() {
+        runCatching { fileStore.writeCheckpointEnvelope(snapshotEnvelope()) }
     }
 
     private fun currentThreadType(): CircleBoxEventThread {

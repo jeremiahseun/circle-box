@@ -9,6 +9,7 @@ class CircleBoxConfig {
     this.installFlutterErrorHooks = true,
     this.captureSilentFlutterErrors = false,
     this.captureCurrentIsolateErrors = true,
+    this.enableDebugViewer = false,
   });
 
   final int bufferCapacity;
@@ -19,6 +20,7 @@ class CircleBoxConfig {
   final bool installFlutterErrorHooks;
   final bool captureSilentFlutterErrors;
   final bool captureCurrentIsolateErrors;
+  final bool enableDebugViewer;
 
   /// Converts the config into a method-channel payload.
   Map<String, Object> toMap() {
@@ -31,6 +33,7 @@ class CircleBoxConfig {
       'installFlutterErrorHooks': installFlutterErrorHooks,
       'captureSilentFlutterErrors': captureSilentFlutterErrors,
       'captureCurrentIsolateErrors': captureCurrentIsolateErrors,
+      'enableDebugViewer': enableDebugViewer,
     };
   }
 }

@@ -4,7 +4,7 @@ import CircleBoxSDK
 @main
 struct CircleBoxApp: App {
     init() {
-        CircleBox.start()
+        CircleBox.start(config: CircleBoxConfig(enableDebugViewer: true))
     }
 
     var body: some Scene {

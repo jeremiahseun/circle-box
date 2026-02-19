@@ -1,16 +1,23 @@
-# flutter_chaos_app
+# Flutter Chaos App
 
-A new Flutter project.
+Flutter sample app for validating CircleBox bridge behavior and Phase 2 export flows.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+cd samples/flutter_chaos_app
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Validation Flow
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Trigger mock context actions (`thermal`, `battery`, `network`, `permission`, `disk`, breadcrumb).
+2. Trigger Flutter error hooks:
+   - Framework Error
+   - Async Unhandled Error
+   - Isolate Unhandled Error
+3. Export logs with selected formats (`json`, `csv`, `json_gzip`, `csv_gzip`, `summary`).
+4. Verify exported paths and file sizes are shown.
+5. Tap **Load Viewer Snapshot** to inspect in-memory ring-buffer events.
+6. If a pending crash report exists, confirm launch dialog offers immediate export.

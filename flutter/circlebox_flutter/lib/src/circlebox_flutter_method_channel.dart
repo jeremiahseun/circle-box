@@ -40,4 +40,16 @@ class MethodChannelCircleBoxFlutter extends CircleBoxFlutterPlatform {
   Future<void> clearPendingCrashReport() async {
     await methodChannel.invokeMethod<void>('clearPendingCrashReport');
   }
+
+  @override
+  Future<List<Map<Object?, Object?>>> debugSnapshot({int maxEvents = 200}) async {
+    final raw = await methodChannel.invokeListMethod<Object?>(
+      'debugSnapshot',
+      {'maxEvents': maxEvents},
+    );
+    if (raw == null) {
+      return const [];
+    }
+    return raw.whereType<Map<Object?, Object?>>().toList(growable: false);
+  }
 }

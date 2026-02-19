@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "CircleBox RN Chaos",
+    "slug": "circlebox-rn-chaos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "plugins": ["circlebox-react-native"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.circlebox.sample.rn"
+    }
+  }
+}

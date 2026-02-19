@@ -1,0 +1,36 @@
+{
+  "app_version": "1.0",
+  "build_number": "1",
+  "capture_reason": "uncaught_exception",
+  "device_model": "iPhone",
+  "events": [
+    {
+      "attrs": {
+        "state": "critical"
+      },
+      "seq": 97,
+      "severity": "warn",
+      "thread": "background",
+      "timestamp_unix_ms": 1771490111000,
+      "type": "thermal_state",
+      "uptime_ms": 22200
+    },
+    {
+      "attrs": {
+        "details": "NSInvalidArgumentException:unit-test"
+      },
+      "seq": 98,
+      "severity": "fatal",
+      "thread": "crash",
+      "timestamp_unix_ms": 1771490112000,
+      "type": "native_exception_prehook",
+      "uptime_ms": 22300
+    }
+  ],
+  "export_source": "pending_crash",
+  "generated_at_unix_ms": 1771490113000,
+  "os_version": "17.0",
+  "platform": "ios",
+  "schema_version": 2,
+  "session_id": "IOS-PENDING-SESSION"
+}

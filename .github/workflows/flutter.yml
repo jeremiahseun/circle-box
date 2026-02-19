@@ -4,14 +4,16 @@ on:
   push:
     paths:
       - 'flutter/**'
+      - 'samples/flutter_chaos_app/**'
       - '.github/workflows/flutter.yml'
   pull_request:
     paths:
       - 'flutter/**'
+      - 'samples/flutter_chaos_app/**'
       - '.github/workflows/flutter.yml'
 
 jobs:
-  test:
+  plugin:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,3 +38,37 @@ jobs:
         with:
           name: circlebox-flutter-plugin
           path: flutter/circlebox_flutter/artifacts/circlebox_flutter.tgz
+
+  adapters:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/circlebox_adapters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+
+  chaos-sample:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: samples/flutter_chaos_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test

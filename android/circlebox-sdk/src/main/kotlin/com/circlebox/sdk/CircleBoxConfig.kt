@@ -15,7 +15,9 @@ data class CircleBoxConfig(
     /** Maximum attribute value length before truncation. */
     val maxAttributeLength: Int = 256,
     /** Interval for periodic disk-space samples. */
-    val diskCheckIntervalSec: Long = 60
+    val diskCheckIntervalSec: Long = 60,
+    /** Enables debug-only viewer access to current in-memory ring buffer events. */
+    val enableDebugViewer: Boolean = false
 ) {
     init {
         require(bufferCapacity > 0) { "bufferCapacity must be > 0" }
