@@ -7,6 +7,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.circlebox.sdk.CircleBox
 import com.circlebox.sdk.CircleBoxConfig
+import com.circlebox.sdk.CircleBoxEvent
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,19 +46,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnViewer).setOnClickListener {
-            val events = CircleBox.debugSnapshot(200)
-            val body = if (events.isEmpty()) {
-                "No events captured (enableDebugViewer=false or empty buffer)"
-            } else {
-                events.joinToString("\n") { event ->
-                    "#${event.seq} ${event.type} [${event.severity.name.lowercase()}] ${event.attrs}"
-                }
-            }
-            AlertDialog.Builder(this)
-                .setTitle("CircleBox Viewer")
-                .setMessage(body)
-                .setPositiveButton("Close", null)
-                .show()
+            openViewerDialog()
         }
 
         findViewById<Button>(R.id.btnCrash).setOnClickListener {
@@ -79,5 +68,96 @@ class MainActivity : AppCompatActivity() {
                 .setNegativeButton("Later", null)
                 .show()
         }
+    }
+
+    private fun openViewerDialog() {
+        val events = CircleBox.debugSnapshot(200)
+        if (events.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("CircleBox Viewer")
+                .setMessage("No events captured (enableDebugViewer=false or empty buffer)")
+                .setPositiveButton("Close", null)
+                .show()
+            return
+        }
+
+        val typeOptions = listOf("all") + events.map { event -> event.type }.distinct().sorted()
+        selectTypeFilter(events, typeOptions)
+    }
+
+    private fun selectTypeFilter(events: List<CircleBoxEvent>, typeOptions: List<String>) {
+        AlertDialog.Builder(this)
+            .setTitle("Filter: Type")
+            .setItems(typeOptions.toTypedArray()) { _, typeIndex ->
+                selectSeverityFilter(events, typeOptions[typeIndex])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun selectSeverityFilter(events: List<CircleBoxEvent>, typeFilter: String) {
+        val severityOptions = arrayOf("all", "info", "warn", "error", "fatal")
+        AlertDialog.Builder(this)
+            .setTitle("Filter: Severity")
+            .setItems(severityOptions) { _, severityIndex ->
+                selectThreadFilter(events, typeFilter, severityOptions[severityIndex])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun selectThreadFilter(
+        events: List<CircleBoxEvent>,
+        typeFilter: String,
+        severityFilter: String
+    ) {
+        val threadOptions = arrayOf("all", "main", "background", "crash")
+        AlertDialog.Builder(this)
+            .setTitle("Filter: Thread")
+            .setItems(threadOptions) { _, threadIndex ->
+                val threadFilter = threadOptions[threadIndex]
+                val filteredEvents = events.filter { event ->
+                    val typeMatch = typeFilter == "all" || event.type == typeFilter
+                    val severityMatch = severityFilter == "all" || event.severity.name.lowercase() == severityFilter
+                    val threadMatch = threadFilter == "all" || event.thread.name.lowercase() == threadFilter
+                    typeMatch && severityMatch && threadMatch
+                }
+                showFilteredViewer(
+                    events = filteredEvents,
+                    totalCount = events.size,
+                    typeFilter = typeFilter,
+                    severityFilter = severityFilter,
+                    threadFilter = threadFilter
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showFilteredViewer(
+        events: List<CircleBoxEvent>,
+        totalCount: Int,
+        typeFilter: String,
+        severityFilter: String,
+        threadFilter: String
+    ) {
+        val title = "CircleBox Viewer (${events.size}/$totalCount)"
+        val header = "type=$typeFilter severity=$severityFilter thread=$threadFilter"
+        val body = if (events.isEmpty()) {
+            "$header\n\nNo events match the selected filters."
+        } else {
+            "$header\n\n" + events.joinToString("\n") { event ->
+                "#${event.seq} ${event.type} [${event.severity.name.lowercase()}] ${event.attrs}"
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(body)
+            .setPositiveButton("Close", null)
+            .setNeutralButton("Adjust Filters") { _, _ ->
+                openViewerDialog()
+            }
+            .show()
     }
 }

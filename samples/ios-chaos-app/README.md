@@ -17,3 +17,4 @@ open CircleBoxChaosApp.xcodeproj
 3. Re-open app.
 4. Export logs and inspect JSON/CSV ordering.
 5. Tap **Open Local Viewer** to inspect in-memory timeline events.
+6. Apply viewer filters (`type`, `severity`, `thread`) to narrow the event timeline.

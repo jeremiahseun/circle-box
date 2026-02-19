@@ -20,4 +20,5 @@ flutter run
 3. Export logs with selected formats (`json`, `csv`, `json_gzip`, `csv_gzip`, `summary`).
 4. Verify exported paths and file sizes are shown.
 5. Tap **Load Viewer Snapshot** to inspect in-memory ring-buffer events.
-6. If a pending crash report exists, confirm launch dialog offers immediate export.
+6. Use viewer filters (`type`, `severity`, `thread`) to focus the timeline.
+7. If a pending crash report exists, confirm launch dialog offers immediate export.

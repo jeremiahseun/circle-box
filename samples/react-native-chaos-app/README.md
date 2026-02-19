@@ -7,7 +7,7 @@ Expo-prebuild sample for validating the React Native bridge end-to-end.
 - React Native API parity (`start`, `breadcrumb`, `exportLogs`, `hasPendingCrashReport`, `clearPendingCrashReport`)
 - Automatic JS error hook capture (global handler + unhandled rejection best effort)
 - Export generation (`json`, `csv`, `json_gzip`, `csv_gzip`, `summary`)
-- Local debug viewer snapshot via `debugSnapshot`
+- Local debug viewer snapshot via `debugSnapshot` with type/severity/thread filters
 
 ## Run
 

@@ -7,6 +7,9 @@ import Darwin
 struct ContentView: View {
     @State private var activeAlert: ActiveAlert?
     @State private var viewerEvents: [CircleBoxEvent] = []
+    @State private var typeFilter = "all"
+    @State private var severityFilter = "all"
+    @State private var threadFilter = "all"
 
     var body: some View {
         NavigationView {
@@ -41,6 +44,10 @@ struct ContentView: View {
 
                 Button("Open Local Viewer") {
                     viewerEvents = CircleBox.debugSnapshot(maxEvents: 200)
+                    let typeOptions = Set(viewerEvents.map(\.type))
+                    if !typeOptions.contains(typeFilter) {
+                        typeFilter = "all"
+                    }
                 }
 
                 Button("Hard Crash") {
@@ -56,9 +63,34 @@ struct ContentView: View {
                 if !viewerEvents.isEmpty {
                     Text("Viewer Events")
                         .font(.headline)
+                    Text("Showing \(filteredViewerEvents.count)/\(viewerEvents.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("Type", selection: $typeFilter) {
+                            ForEach(typeFilterOptions, id: \.self) { value in
+                                Text(value).tag(value)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        Picker("Severity", selection: $severityFilter) {
+                            ForEach(severityFilterOptions, id: \.self) { value in
+                                Text(value).tag(value)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        Picker("Thread", selection: $threadFilter) {
+                            ForEach(threadFilterOptions, id: \.self) { value in
+                                Text(value).tag(value)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach(Array(viewerEvents.enumerated()), id: \.offset) { _, event in
+                            ForEach(Array(filteredViewerEvents.enumerated()), id: \.offset) { _, event in
                                 Text("#\(event.seq) \(event.type) [\(event.severity.rawValue)] \(event.attrs)")
                                     .font(.caption)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,6 +124,27 @@ struct ContentView: View {
                     )
                 }
             }
+        }
+    }
+
+    private var typeFilterOptions: [String] {
+        ["all"] + Array(Set(viewerEvents.map(\.type))).sorted()
+    }
+
+    private var severityFilterOptions: [String] {
+        ["all", "info", "warn", "error", "fatal"]
+    }
+
+    private var threadFilterOptions: [String] {
+        ["all", "main", "background", "crash"]
+    }
+
+    private var filteredViewerEvents: [CircleBoxEvent] {
+        viewerEvents.filter { event in
+            let typeMatch = typeFilter == "all" || event.type == typeFilter
+            let severityMatch = severityFilter == "all" || event.severity.rawValue == severityFilter
+            let threadMatch = threadFilter == "all" || event.thread.rawValue == threadFilter
+            return typeMatch && severityMatch && threadMatch
         }
     }
 

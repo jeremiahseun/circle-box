@@ -41,6 +41,10 @@ class ChaosHomeScreen extends StatefulWidget {
 }
 
 class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
+  static const String _allFilter = 'all';
+  static const List<String> _severityOptions = [_allFilter, 'info', 'warn', 'error', 'fatal'];
+  static const List<String> _threadOptions = [_allFilter, 'main', 'background', 'crash'];
+
   final Set<CircleBoxExportFormat> _selectedFormats = {
     CircleBoxExportFormat.json,
     CircleBoxExportFormat.csv,
@@ -53,6 +57,9 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
   List<CircleBoxDebugEvent> _debugEvents = const [];
   String? _statusMessage;
   bool _pendingDialogShown = false;
+  String _typeFilter = _allFilter;
+  String _severityFilter = _allFilter;
+  String _threadFilter = _allFilter;
 
   @override
   void initState() {
@@ -120,6 +127,16 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
     }
     setState(() {
       _debugEvents = events;
+      final typeOptions = {_allFilter, ...events.map((event) => event.type)};
+      if (!typeOptions.contains(_typeFilter)) {
+        _typeFilter = _allFilter;
+      }
+      if (!_severityOptions.contains(_severityFilter)) {
+        _severityFilter = _allFilter;
+      }
+      if (!_threadOptions.contains(_threadFilter)) {
+        _threadFilter = _allFilter;
+      }
       _statusMessage = 'Loaded ${events.length} debug event(s)';
     });
   }
@@ -171,8 +188,55 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
     });
   }
 
+  List<String> get _typeOptions {
+    final types = _debugEvents.map((event) => event.type).toSet().toList(growable: false)..sort();
+    return [_allFilter, ...types];
+  }
+
+  List<CircleBoxDebugEvent> get _filteredDebugEvents {
+    return _debugEvents.where((event) {
+      final typeMatch = _typeFilter == _allFilter || event.type == _typeFilter;
+      final severityMatch = _severityFilter == _allFilter || event.severity == _severityFilter;
+      final threadMatch = _threadFilter == _allFilter || event.thread == _threadFilter;
+      return typeMatch && severityMatch && threadMatch;
+    }).toList(growable: false);
+  }
+
+  Widget _buildFilterGroup({
+    required String label,
+    required List<String> options,
+    required String selected,
+    required ValueChanged<String> onSelected,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((value) {
+            return ChoiceChip(
+              label: Text(value),
+              selected: selected == value,
+              onSelected: (active) {
+                if (!active) {
+                  return;
+                }
+                onSelected(value);
+              },
+            );
+          }).toList(growable: false),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filteredDebugEvents = _filteredDebugEvents;
+
     return Scaffold(
       appBar: AppBar(title: const Text('CircleBox Flutter Chaos')),
       body: ListView(
@@ -249,6 +313,35 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
             title: 'Local Viewer',
             children: [
               _ActionButton(title: 'Load Viewer Snapshot', onPressed: _loadViewer),
+              if (_debugEvents.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildFilterGroup(
+                  label: 'Type',
+                  options: _typeOptions,
+                  selected: _typeFilter,
+                  onSelected: (value) => setState(() {
+                    _typeFilter = value;
+                  }),
+                ),
+                const SizedBox(height: 8),
+                _buildFilterGroup(
+                  label: 'Severity',
+                  options: _severityOptions,
+                  selected: _severityFilter,
+                  onSelected: (value) => setState(() {
+                    _severityFilter = value;
+                  }),
+                ),
+                const SizedBox(height: 8),
+                _buildFilterGroup(
+                  label: 'Thread',
+                  options: _threadOptions,
+                  selected: _threadFilter,
+                  onSelected: (value) => setState(() {
+                    _threadFilter = value;
+                  }),
+                ),
+              ],
             ],
           ),
           if (_statusMessage != null) ...[
@@ -263,9 +356,12 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
           ],
           if (_debugEvents.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Text('Viewer Events', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Viewer Events (${filteredDebugEvents.length}/${_debugEvents.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
-            ..._debugEvents.map(
+            ...filteredDebugEvents.map(
               (event) => Card(
                 child: ListTile(
                   dense: true,
