@@ -38,6 +38,8 @@ jobs:
         run: |
           npm install
           npm run typecheck
+          npm run check:links
+          npm run build
 
       - name: RN cloud uploader typecheck
         working-directory: react-native/circlebox-cloud-react-native

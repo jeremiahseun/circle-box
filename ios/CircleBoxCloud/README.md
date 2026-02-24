@@ -2,6 +2,16 @@
 
 Companion uploader package for CircleBox Cloud.
 
+## Install (Swift Package)
+
+Use the root repository package:
+
+```swift
+.package(url: "https://github.com/jeremiahseun/circlebox.git", from: "0.3.0")
+```
+
+Then add product dependency: `CircleBoxCloud`.
+
 ## Usage
 
 ```swift

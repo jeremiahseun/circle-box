@@ -12,7 +12,7 @@ export default function CrashDetailActions(props: CrashDetailActionsProps) {
   const [status, setStatus] = useState<string | null>(null);
 
   const deepLink = useMemo(() => {
-    return `/crashes/${props.reportId}?project_id=${encodeURIComponent(props.projectId)}&region=${encodeURIComponent(props.region)}`;
+    return `/dashboard/crashes/${props.reportId}?project_id=${encodeURIComponent(props.projectId)}&region=${encodeURIComponent(props.region)}`;
   }, [props.projectId, props.region, props.reportId]);
 
   async function copyText(value: string, message: string) {
@@ -45,10 +45,11 @@ export default function CrashDetailActions(props: CrashDetailActionsProps) {
 
   return (
     <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-      <button type="button" onClick={() => copyText(props.reportId, "Report ID copied")}>
+      <button className="btn" type="button" onClick={() => copyText(props.reportId, "Report ID copied")}>
         Copy report ID
       </button>
       <button
+        className="btn"
         type="button"
         onClick={() => {
           const absolute = `${window.location.origin}${deepLink}`;
@@ -57,7 +58,7 @@ export default function CrashDetailActions(props: CrashDetailActionsProps) {
       >
         Copy deep link
       </button>
-      <button type="button" onClick={() => void handleShare()}>
+      <button className="btn" type="button" onClick={() => void handleShare()}>
         Share link
       </button>
       {status && <span style={{ color: "#0f766e" }}>{status}</span>}

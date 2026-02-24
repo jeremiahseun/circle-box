@@ -32,3 +32,25 @@ jobs:
         with:
           name: circlebox-sdk-aar
           path: android/circlebox-sdk/build/outputs/aar/*.aar
+
+  cloud:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/circlebox-cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Unit tests
+        run: ../circlebox-sdk/gradlew --no-daemon -p . test
+      - name: Assemble cloud AAR
+        run: ../circlebox-sdk/gradlew --no-daemon -p . assembleRelease
+      - name: Upload cloud AAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: circlebox-cloud-aar
+          path: android/circlebox-cloud/build/outputs/aar/*.aar

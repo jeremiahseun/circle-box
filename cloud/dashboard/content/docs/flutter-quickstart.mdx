@@ -1,0 +1,61 @@
+---
+title: Flutter Quickstart
+description: Use circlebox_flutter with optional cloud uploader and adapters.
+order: 4
+---
+
+## Install From Git Tag
+
+```yaml
+dependencies:
+  circlebox_flutter:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_flutter
+  circlebox_cloud_flutter:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_cloud_flutter
+  circlebox_adapters:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_adapters
+```
+
+## Core Setup
+
+```dart
+await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
+await CircleBox.breadcrumb('checkout_started', attrs: {'flow': 'standard'});
+```
+
+## Pending Crash Export
+
+```dart
+if (await CircleBox.hasPendingCrashReport()) {
+  final files = await CircleBox.exportLogs(
+    formats: {
+      CircleBoxExportFormat.json,
+      CircleBoxExportFormat.csv,
+      CircleBoxExportFormat.jsonGzip,
+      CircleBoxExportFormat.csvGzip,
+      CircleBoxExportFormat.summary,
+    },
+  );
+  print(files);
+}
+```
+
+## Optional Cloud Upload
+
+```dart
+await CircleBoxCloud.start(
+  const CircleBoxCloudConfig(
+    endpoint: Uri.parse('https://circlebox.seunjeremiah.workers.dev'),
+    ingestKey: 'cb_live_<project_uuid>_us_<secret>',
+  ),
+);
+```

@@ -1,0 +1,39 @@
+---
+title: Troubleshooting and FAQ
+description: Common setup and runtime issues across SDKs and cloud pipeline.
+order: 11
+---
+
+## I exported logs but can’t find files
+
+Use returned absolute paths from `exportLogs()`.  
+Platform default export folders:
+
+- iOS: `Library/Application Support/CircleBox/exports/`
+- Android: `<filesDir>/circlebox/exports/`
+
+## `hasPendingCrashReport()` is false after a crash
+
+- Confirm crash path reached uncaught handler.
+- Confirm signal capture is enabled on iOS (`enableSignalCrashCapture = true`).
+- Ensure app relaunched after hard crash before manual export.
+
+## Dashboard shows no rows
+
+- Confirm `project_id` and `region` match ingest key.
+- Confirm dashboard env vars point to correct Supabase region projects.
+- Run ingest smoke script and verify accepted response.
+
+## Raw download fails with 401/403
+
+- Ensure `DASHBOARD_WORKER_TOKEN` matches worker secret.
+- Ensure `DASHBOARD_SHARED_SECRET` is set in worker.
+- Retry quickly; signed download URLs expire.
+
+## Can I use CircleBox without Sentry/PostHog?
+
+Yes. Core SDK and cloud uploader are fully standalone.
+
+## Can I forward CircleBox to Sentry/PostHog?
+
+Yes. Use companion adapters documented in [Sentry and PostHog Integrations](/docs/integrations-sentry-posthog).

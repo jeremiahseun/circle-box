@@ -20,6 +20,24 @@ The following worker-first slice is now implemented:
    - foreground-only queue auto-drain on interval
    - no periodic live snapshot export in automatic mode
 
+## Phase 3B Productization Status (Current)
+
+The current phase extends Phase 3A with delivery and developer activation:
+
+1. Single cloud website under `cloud/dashboard` now contains:
+   - landing page (`/`)
+   - docs portal (`/docs`)
+   - admin dashboard (`/dashboard/crashes`)
+2. Installable-today distribution tracks:
+   - Swift products from root `Package.swift`
+   - Android release AAR artifacts
+   - Flutter git-path package installation
+   - React Native release `.tgz` packages
+3. Release automation:
+   - tag-triggered release workflow with checksums and manifest
+   - local release gate script `scripts/release_check.sh`
+   - version alignment guard `scripts/check_release_versions.sh`
+
 This plan is optimized for:
 - **Cost cap:** `<$1k/month` infra at launch
 - **Scale target:** up to `10M events/month` first 6 months

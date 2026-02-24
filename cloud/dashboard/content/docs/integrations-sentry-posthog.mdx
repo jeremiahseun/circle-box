@@ -1,0 +1,48 @@
+---
+title: Sentry and PostHog Integrations
+description: Use optional companion adapters while keeping CircleBox core vendor-neutral.
+order: 7
+---
+
+## Integration Principle
+
+CircleBox core packages do not depend on Sentry or PostHog.
+
+Use companion adapter modules when you need forwarding:
+
+- iOS: `integrations/ios/CircleBoxIntegrations`
+- Android: `integrations/android/circlebox-integrations`
+- Flutter: `flutter/circlebox_adapters`
+
+## What Gets Mapped
+
+### Sentry
+
+- Event `type` -> breadcrumb `category`
+- Event `severity` -> breadcrumb `level`
+- `attrs.message` -> breadcrumb `message` (fallback: event type)
+- `attrs` + thread/severity context -> breadcrumb `data`
+
+### PostHog
+
+- Envelope metadata -> event properties
+- Summary counters -> properties for trending
+- Crash marker presence -> explicit property for triage
+
+## Adapter Usage
+
+### Flutter
+
+```dart
+await CircleBoxAdapterForwarder.forwardExportPaths(
+  exportPaths,
+  onSentryBreadcrumb: (breadcrumb) async {
+    // sentry_flutter breadcrumb call
+  },
+  onPostHogCapture: (event) async {
+    // posthog_flutter capture call
+  },
+);
+```
+
+See `/Users/mac/Documents/GitHub/circlebox/docs/integrations.md` for full mapping details.

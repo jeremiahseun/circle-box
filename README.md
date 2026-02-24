@@ -82,7 +82,7 @@ On uncaught crash paths:
 - `android/circlebox-cloud` - Android cloud companion uploader
 - `flutter/circlebox_cloud_flutter` - Flutter cloud companion uploader
 - `cloud/circlebox-cloud` - Cloud backend workspace (Cloudflare Worker ingest + Supabase metadata + jobs)
-- `cloud/dashboard` - Cloud dashboard frontend (timeline-first)
+- `cloud/dashboard` - Cloud website (landing + docs + admin dashboard)
 - `samples/ios-chaos-app` - iOS sample scaffold
 - `samples/android-chaos-app` - Android sample app
 - `samples/flutter_chaos_app` - Flutter chaos validator app
@@ -92,6 +92,7 @@ On uncaught crash paths:
 - `docs/integrations.md` - adapter and forwarding integration guide
 - `docs/phase1-closeout.md` - Phase 1 acceptance and sign-off checklist
 - `scripts/check_naming.sh` - naming guard script
+- `scripts/check_release_versions.sh` - release version alignment guard
 - `scripts/check_schema_parity.py` - fixture parity contract checker
 - `scripts/decode_persistence.py` - pending/checkpoint decoder utility
 - `.github/workflows` - CI workflows
@@ -102,6 +103,17 @@ On uncaught crash paths:
 - Android API 23+
 - Flutter 3.22+ for bridge package
 - React Native 0.73+ (bare or Expo prebuild) for RN bridge package
+
+## Installable Today
+
+CircleBox release mode is **git-tag + release artifacts**:
+
+- iOS: Swift Package products from git tag (`CircleBoxSDK`, `CircleBoxCloud`, `CircleBoxIntegrations`)
+- Android: GitHub Release AAR assets (`circlebox-sdk`, `circlebox-cloud`)
+- Flutter: Git dependency with monorepo `path`
+- React Native: GitHub Release `.tgz` packages
+
+See `cloud/dashboard/content/docs/release-matrix.mdx` for full install matrix.
 
 ## Quick Start
 
@@ -268,6 +280,7 @@ Worker-first cloud deployment helpers:
 - `scripts/deploy_cloud_worker.sh`
 - `scripts/smoke_test_worker_ingest.sh`
 - `scripts/deploy_phase3_cloud.sh`
+- `scripts/release_check.sh`
 
 Manual flow:
 
@@ -283,6 +296,12 @@ Manual flow:
 
 ```bash
 bash scripts/check_naming.sh
+```
+
+### Release Version Guard
+
+```bash
+bash scripts/check_release_versions.sh 0.3.0
 ```
 
 ### iOS Tests
@@ -324,6 +343,18 @@ gradle assembleRelease
 python3 scripts/check_schema_parity.py
 ```
 
+### Full Release Gate (Local)
+
+```bash
+bash scripts/release_check.sh
+```
+
+Optional smoke flags for release check:
+
+- `CIRCLEBOX_WORKER_BASE_URL`
+- `CIRCLEBOX_SMOKE_INGEST_KEY`
+- `DASHBOARD_WORKER_TOKEN` (optional, enables download-flow validation)
+
 ### Decode Pending/Checkpoint Files
 
 ```bash
@@ -339,6 +370,7 @@ python3 scripts/decode_persistence.py /absolute/path/to/latest.circlebox
 - `react-native.yml` - React Native bridge and sample typecheck
 - `schema-parity.yml` - schema-v2 fixture contract checks
 - `cloud.yml` - Phase 3A cloud/backend/uploader checks
+- `release.yml` - tag-driven multi-platform release assets + checksum manifest
 
 ## Privacy and Safety Defaults
 

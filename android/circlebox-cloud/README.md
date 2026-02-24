@@ -2,6 +2,24 @@
 
 Companion uploader module for CircleBox Cloud.
 
+## Install (release AAR)
+
+1. Download `circlebox-cloud-release.aar` from the tagged release.
+2. Place it in your app `libs/` folder.
+3. Add:
+
+```gradle
+repositories {
+  flatDir {
+    dirs("$rootDir/libs")
+  }
+}
+
+dependencies {
+  implementation(name: "circlebox-cloud-release", ext: "aar")
+}
+```
+
 ## Usage
 
 ```kotlin

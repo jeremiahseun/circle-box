@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - 'ios/**'
+      - 'integrations/ios/**'
+      - 'Package.swift'
       - '.github/workflows/ios.yml'
   pull_request:
     paths:
       - 'ios/**'
+      - 'integrations/ios/**'
+      - 'Package.swift'
       - '.github/workflows/ios.yml'
 
 jobs:
@@ -32,3 +36,44 @@ jobs:
         with:
           name: CircleBoxSDK-swiftpm-release
           path: ios/CircleBoxSDK/artifacts/CircleBoxSDK-swiftpm-release.tgz
+
+  cloud:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios/CircleBoxCloud
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Package artifact
+        run: |
+          mkdir -p artifacts
+          swift build -c release
+          tar -czf artifacts/CircleBoxCloud-swiftpm-release.tgz .build/release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CircleBoxCloud-swiftpm-release
+          path: ios/CircleBoxCloud/artifacts/CircleBoxCloud-swiftpm-release.tgz
+
+  integrations:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: integrations/ios/CircleBoxIntegrations
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+      - name: Package source artifact
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/CircleBoxIntegrations-source.tgz Sources Package.swift README.md
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CircleBoxIntegrations-source
+          path: integrations/ios/CircleBoxIntegrations/artifacts/CircleBoxIntegrations-source.tgz

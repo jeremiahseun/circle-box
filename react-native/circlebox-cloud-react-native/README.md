@@ -2,6 +2,13 @@
 
 Companion uploader for sending CircleBox exports to CircleBox Cloud.
 
+## Install (release tarball)
+
+```bash
+npm install ./circlebox-react-native-0.3.0.tgz
+npm install ./circlebox-cloud-react-native-0.3.0.tgz
+```
+
 ## Usage
 
 ```ts

@@ -1,7 +1,10 @@
 name: circlebox_adapters
 description: Companion adapters for forwarding CircleBox exports into Sentry/PostHog pipelines.
-version: 0.1.0
+version: 0.3.0
 publish_to: "none"
+homepage: https://github.com/jeremiahseun/circlebox
+repository: https://github.com/jeremiahseun/circlebox
+issue_tracker: https://github.com/jeremiahseun/circlebox/issues
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

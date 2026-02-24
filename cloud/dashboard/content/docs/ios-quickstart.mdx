@@ -1,0 +1,54 @@
+---
+title: iOS Quickstart
+description: Use CircleBox SDK and CircleBoxCloud in Swift apps with SPM.
+order: 2
+---
+
+## Install (Git Tag)
+
+Add the repository as a Swift Package dependency:
+
+```swift
+.package(url: "https://github.com/jeremiahseun/circlebox.git", from: "0.3.0")
+```
+
+Select products:
+
+- `CircleBoxSDK`
+- `CircleBoxCloud` (optional)
+- `CircleBoxIntegrations` (optional adapter helpers)
+
+## Core Setup
+
+```swift
+import CircleBoxSDK
+
+CircleBox.start(config: .default)
+CircleBox.breadcrumb("checkout_started", attrs: ["flow": "standard"])
+```
+
+## Pending Crash Export
+
+```swift
+if CircleBox.hasPendingCrashReport() {
+    let paths = try CircleBox.exportLogs(formats: [.json, .csv, .jsonGzip, .summary])
+    print(paths)
+}
+```
+
+## Optional Cloud Upload
+
+```swift
+import CircleBoxCloud
+
+CircleBoxCloud.start(
+  config: CircleBoxCloudConfig(
+    endpoint: URL(string: "https://circlebox.seunjeremiah.workers.dev")!,
+    ingestKey: "cb_live_<project_uuid>_us_<secret>"
+  )
+)
+```
+
+## Optional Adapter Use
+
+Use `CircleBoxIntegrations` to map exports into Sentry breadcrumbs or PostHog properties without pulling those SDKs into core CircleBox.

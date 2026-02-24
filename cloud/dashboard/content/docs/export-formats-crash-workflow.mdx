@@ -1,0 +1,50 @@
+---
+title: Export Formats and Crash Workflow
+description: Understand pending reports, export sources, and compact formats.
+order: 8
+---
+
+## Export Formats
+
+CircleBox supports:
+
+- `json`
+- `csv`
+- `json_gzip`
+- `csv_gzip`
+- `summary`
+
+## Provenance Fields
+
+Each report contains:
+
+- `export_source`: `pending_crash` or `live_snapshot`
+- `capture_reason`: `uncaught_exception`, `manual_export`, `startup_pending_detection`
+
+These fields let you separate real crash-path artifacts from manual snapshots.
+
+## Crash Workflow
+
+1. Runtime events fill ring buffer.
+2. Crash path appends `native_exception_prehook`.
+3. Pending report is persisted.
+4. Next launch detects pending report.
+5. App exports and optionally uploads pending report first.
+
+## CSV Notes
+
+CSV includes metadata row and stable event columns:
+
+- `seq`
+- `timestamp_unix_ms`
+- `uptime_ms`
+- `type`
+- `thread`
+- `severity`
+- `attrs_json`
+
+## Size Reduction Guidance
+
+- Prefer `summary` for quick telemetry.
+- Use `json_gzip` for transport.
+- Keep full `json` only where deep forensics is needed.

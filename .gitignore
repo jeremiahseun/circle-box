@@ -29,6 +29,7 @@ flutter/circlebox_flutter/pubspec.lock
 .next/
 out/
 *.tsbuildinfo
+artifacts/
 
 # Wrangler
 .wrangler/

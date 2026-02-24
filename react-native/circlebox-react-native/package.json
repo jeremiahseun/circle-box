@@ -1,6 +1,6 @@
 {
   "name": "circlebox-react-native",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "React Native bridge for CircleBox native SDKs",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -16,7 +16,8 @@
     "README.md"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack:release": "npm pack"
   },
   "keywords": [
     "react-native",
@@ -25,6 +26,11 @@
     "observability"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeremiahseun/circlebox.git",
+    "directory": "react-native/circlebox-react-native"
+  },
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.73.0"

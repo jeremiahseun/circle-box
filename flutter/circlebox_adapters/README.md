@@ -2,6 +2,17 @@
 
 Companion adapter package for forwarding CircleBox export files into Sentry and PostHog pipelines.
 
+## Install (Git tag + monorepo path)
+
+```yaml
+dependencies:
+  circlebox_adapters:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_adapters
+```
+
 ## What It Does
 
 - Ingests CircleBox export files (`json`, `json.gz`, `csv`, `csv.gz`, `summary.json`)

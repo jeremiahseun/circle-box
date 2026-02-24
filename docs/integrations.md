@@ -67,3 +67,13 @@ await CircleBoxAdapterForwarder.forwardExportPaths(
 
 Phase 2 integrations provide mapping helpers and forwarding utilities.
 Managed ingestion/storage/dashboard remains Phase 3 scope.
+
+## Installation Paths
+
+You can run CircleBox:
+
+1. **Without adapters** (core only or core + cloud)
+2. **With adapters** (core + optional Sentry/PostHog forwarding)
+
+For install commands by platform, use the release matrix in:
+- `cloud/dashboard/content/docs/release-matrix.mdx`

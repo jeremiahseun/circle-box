@@ -1,0 +1,63 @@
+---
+title: Android Quickstart
+description: Install CircleBox Android artifacts and wire crash context capture.
+order: 3
+---
+
+## Install (GitHub Release AAR)
+
+Download AAR artifacts from the tagged release:
+
+- `circlebox-sdk-release.aar`
+- `circlebox-cloud-release.aar` (optional)
+
+Add to your app module:
+
+```gradle
+repositories {
+  flatDir {
+    dirs("$rootDir/libs")
+  }
+}
+
+dependencies {
+  implementation(name: "circlebox-sdk-release", ext: "aar")
+  implementation(name: "circlebox-cloud-release", ext: "aar") // optional
+}
+```
+
+Verify checksums against the release `checksums.txt`.
+
+## Core Setup
+
+```kotlin
+CircleBox.start()
+CircleBox.breadcrumb("checkout_started", mapOf("flow" to "standard"))
+```
+
+## Pending Crash Export
+
+```kotlin
+if (CircleBox.hasPendingCrashReport()) {
+  val files = CircleBox.exportLogs(
+    setOf(
+      CircleBoxExportFormat.JSON,
+      CircleBoxExportFormat.CSV,
+      CircleBoxExportFormat.JSON_GZIP,
+      CircleBoxExportFormat.SUMMARY
+    )
+  )
+  println(files)
+}
+```
+
+## Optional Cloud Upload
+
+```kotlin
+CircleBoxCloud.start(
+  CircleBoxCloudConfig(
+    endpoint = "https://circlebox.seunjeremiah.workers.dev",
+    ingestKey = "cb_live_<project_uuid>_us_<secret>"
+  )
+)
+```

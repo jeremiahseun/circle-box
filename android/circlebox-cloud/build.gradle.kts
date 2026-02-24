@@ -3,6 +3,9 @@ plugins {
     kotlin("android") version "1.9.24"
 }
 
+group = "com.circlebox.cloud"
+version = "0.3.0"
+
 android {
     namespace = "com.circlebox.cloud"
     compileSdk = 34

@@ -2,6 +2,17 @@
 
 Companion uploader package for CircleBox Cloud.
 
+## Install (Git tag + monorepo path)
+
+```yaml
+dependencies:
+  circlebox_cloud_flutter:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_cloud_flutter
+```
+
 ## Usage
 
 ```dart

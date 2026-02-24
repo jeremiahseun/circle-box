@@ -4,6 +4,9 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+group = "com.circlebox.sdk"
+version = "0.3.0"
+
 android {
     namespace = "com.circlebox.sdk"
     compileSdk = 34

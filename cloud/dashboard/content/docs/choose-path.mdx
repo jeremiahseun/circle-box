@@ -1,0 +1,36 @@
+---
+title: Choose Your Path
+description: Pick the minimum CircleBox setup that matches your team stage.
+order: 9
+---
+
+## Core Only
+
+Use when you need local crash reconstruction in QA or on customer devices without backend integration.
+
+- `CircleBoxSDK` / `circlebox-sdk`
+- `circlebox_flutter` / `circlebox-react-native`
+
+## Core + Cloud
+
+Use when you want managed ingestion, queue retry, and dashboard timelines.
+
+- Core packages above
+- `CircleBoxCloud` / `circlebox-cloud`
+- `circlebox_cloud_flutter` / `circlebox-cloud-react-native`
+
+## Core + Sentry/PostHog
+
+Use when your team already depends on Sentry or PostHog and wants CircleBox context added there.
+
+- Core packages
+- Companion adapters only
+
+## Core + Cloud + Adapters
+
+Use when you want both:
+
+- native-first CircleBox pipeline
+- forwarding to existing observability stack
+
+This path is common during migration from single-vendor crash tooling.

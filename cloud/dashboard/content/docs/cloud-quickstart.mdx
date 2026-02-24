@@ -1,0 +1,55 @@
+---
+title: Cloud Quickstart
+description: Bring up ingest, dashboard, and report downloads using Worker + R2 + Supabase.
+order: 6
+---
+
+## Required Services
+
+- Cloudflare Worker (ingest and signed download endpoints)
+- Cloudflare R2 bucket (`cb-reports-raw`)
+- Supabase US project (data plane)
+- Supabase EU project (data plane)
+
+## Configure Worker Secrets
+
+```bash
+wrangler secret put US_SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put DASHBOARD_WORKER_TOKEN
+wrangler secret put DASHBOARD_SHARED_SECRET
+```
+
+## Deploy Worker
+
+```bash
+cd cloud/circlebox-cloud/edge/worker
+npm install
+npm run deploy
+```
+
+Or from repo root:
+
+```bash
+scripts/deploy_phase3_cloud.sh --ingest-key "cb_live_<project_uuid>_us_<secret>"
+```
+
+## Dashboard Env
+
+Set these in `cloud/dashboard/.env.local`:
+
+- `DASHBOARD_DEFAULT_PROJECT_ID`
+- `DASHBOARD_DEFAULT_REGION`
+- `DASHBOARD_US_SUPABASE_URL`
+- `DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY`
+- `DASHBOARD_EU_SUPABASE_URL`
+- `DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY`
+- `DASHBOARD_WORKER_BASE_URL`
+- `DASHBOARD_WORKER_TOKEN`
+
+## Validate End-to-End
+
+1. Ingest one report from any SDK uploader.
+2. Open `/dashboard/crashes`.
+3. Open detail row.
+4. Download raw report from dashboard action.

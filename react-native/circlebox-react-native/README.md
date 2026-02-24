@@ -21,6 +21,12 @@ It also provides automatic JS error hooks that chain existing handlers:
 npm install circlebox-react-native
 ```
 
+Installable-today release path (without npm publish):
+
+```bash
+npm install ./circlebox-react-native-0.3.0.tgz
+```
+
 For Expo prebuild apps, add plugin in `app.json`:
 
 ```json

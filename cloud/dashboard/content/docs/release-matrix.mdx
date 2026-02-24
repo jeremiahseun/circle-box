@@ -1,0 +1,30 @@
+---
+title: Release Matrix
+description: What is installable today and how to consume it.
+order: 10
+---
+
+## Installable Today (Phase 3B)
+
+| Surface | Install channel | Artifact |
+| --- | --- | --- |
+| iOS Core | Swift Package from git tag | `CircleBoxSDK` product |
+| iOS Cloud | Swift Package from git tag | `CircleBoxCloud` product |
+| iOS Adapters | Swift Package from git tag | `CircleBoxIntegrations` product |
+| Android Core | GitHub Release AAR | `circlebox-sdk-release.aar` |
+| Android Cloud | GitHub Release AAR | `circlebox-cloud-release.aar` |
+| Flutter Core | Git dependency (`path`) | `flutter/circlebox_flutter` |
+| Flutter Cloud | Git dependency (`path`) | `flutter/circlebox_cloud_flutter` |
+| Flutter Adapters | Git dependency (`path`) | `flutter/circlebox_adapters` |
+| RN Core | Release `.tgz` | `circlebox-react-native-*.tgz` |
+| RN Cloud | Release `.tgz` | `circlebox-cloud-react-native-*.tgz` |
+
+## Release Assets
+
+Each tag includes:
+
+- build artifacts
+- `checksums.txt` (SHA-256)
+- install notes and references
+
+Public registries (pub.dev/npm/Maven Central/CocoaPods) are intentionally deferred to hardening phase.

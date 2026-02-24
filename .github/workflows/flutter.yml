@@ -55,6 +55,41 @@ jobs:
         run: flutter analyze
       - name: Test
         run: flutter test
+      - name: Package adapters artifact
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/circlebox_adapters.tgz .
+      - name: Upload adapters artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: circlebox-flutter-adapters
+          path: flutter/circlebox_adapters/artifacts/circlebox_adapters.tgz
+
+  cloud:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/circlebox_cloud_flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+      - name: Package cloud artifact
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/circlebox_cloud_flutter.tgz .
+      - name: Upload cloud artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: circlebox-flutter-cloud
+          path: flutter/circlebox_cloud_flutter/artifacts/circlebox_cloud_flutter.tgz
 
   chaos-sample:
     runs-on: ubuntu-latest

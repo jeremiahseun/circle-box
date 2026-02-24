@@ -1,0 +1,56 @@
+---
+title: React Native Quickstart
+description: Install CircleBox RN bridge and optional cloud uploader from release tarballs.
+order: 5
+---
+
+## Install (Release `.tgz`)
+
+From release assets:
+
+```bash
+npm install ./circlebox-react-native-0.3.0.tgz
+npm install ./circlebox-cloud-react-native-0.3.0.tgz
+```
+
+For Expo prebuild apps, add plugin:
+
+```json
+{
+  "expo": {
+    "plugins": ["circlebox-react-native"]
+  }
+}
+```
+
+## Core Setup
+
+```ts
+import { CircleBox } from "circlebox-react-native";
+
+await CircleBox.start({
+  bufferCapacity: 200,
+  installReactNativeErrorHooks: true,
+});
+await CircleBox.breadcrumb("checkout_started", { flow: "standard" });
+```
+
+## Pending Crash Export
+
+```ts
+if (await CircleBox.hasPendingCrashReport()) {
+  const files = await CircleBox.exportLogs(["json", "csv", "json_gzip", "summary"]);
+  console.log(files);
+}
+```
+
+## Optional Cloud Upload
+
+```ts
+import * as CircleBoxCloud from "circlebox-cloud-react-native";
+
+await CircleBoxCloud.start({
+  endpoint: "https://circlebox.seunjeremiah.workers.dev",
+  ingestKey: "cb_live_<project_uuid>_us_<secret>",
+});
+```

@@ -2,6 +2,17 @@
 
 Flutter bridge for CircleBox native SDKs.
 
+## Install (Git tag + monorepo path)
+
+```yaml
+dependencies:
+  circlebox_flutter:
+    git:
+      url: https://github.com/jeremiahseun/circlebox.git
+      ref: v0.3.0
+      path: flutter/circlebox_flutter
+```
+
 ## API
 
 ```dart
@@ -45,3 +56,8 @@ This plugin calls native `CircleBox` implementations.
 
 - Android: include `com.circlebox.sdk` library in host app.
 - iOS: link `CircleBoxSDK` into host app target.
+
+## Optional Add-ons
+
+- Cloud uploader: `circlebox_cloud_flutter`
+- Sentry/PostHog adapters: `circlebox_adapters`

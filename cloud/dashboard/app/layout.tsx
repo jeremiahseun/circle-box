@@ -1,14 +1,29 @@
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export default function RootLayout(props: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: "ui-sans-serif, system-ui" }}>
-        <div style={{ padding: 24, background: "#ecfeff", borderBottom: "1px solid #99f6e4" }}>
-          <h1 style={{ margin: 0, fontSize: 22 }}>CircleBox Cloud</h1>
-          <p style={{ margin: "8px 0 0", color: "#0f766e" }}>Phase 3A Timeline-First Dashboard</p>
-        </div>
-        <main style={{ padding: 24 }}>{props.children}</main>
+      <body>
+        <div className="orb orb-a" aria-hidden />
+        <div className="orb orb-b" aria-hidden />
+        <header className="site-header">
+          <div className="site-header-inner">
+            <a href="/" className="brand">
+              <span className="brand-mark">CB</span>
+              <span>
+                CircleBox
+                <small>Native Flight Recorder for Mobile SDKs</small>
+              </span>
+            </a>
+            <nav className="nav-links">
+              <a href="/">Home</a>
+              <a href="/docs">Docs</a>
+              <a href="/dashboard/crashes">Dashboard</a>
+            </nav>
+          </div>
+        </header>
+        <main className="page-shell">{props.children}</main>
       </body>
     </html>
   );
