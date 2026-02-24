@@ -16,3 +16,19 @@ android/.gradle/
 .pub/
 flutter/circlebox_flutter/pubspec.lock
 **/node_modules/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+
+# Wrangler
+.wrangler/

@@ -1,0 +1,12 @@
+name = "circlebox"
+main = "src/index.ts"
+compatibility_date = "2026-02-20"
+
+[vars]
+US_SUPABASE_URL = "https://wkrlmudqrvimdzbqjnit.supabase.co"
+EU_SUPABASE_URL = "https://tselsyjxnxmgynqhurhn.supabase.co"
+CIRCLEBOX_R2_BUCKET_RAW_NAME = "cb-reports-raw"
+
+[[r2_buckets]]
+binding = "CB_REPORTS_RAW"
+bucket_name = "cb-reports-raw"

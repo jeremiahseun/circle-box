@@ -24,6 +24,7 @@ CircleBox records environmental transitions such as memory pressure, thermal cha
 - Flutter bridge and chaos sample app
 - React Native bridge (bare + Expo prebuild) with automatic JS error hooks
 - Companion Sentry/PostHog adapters for iOS, Android, and Flutter
+- Companion cloud uploaders with persistent local retry queue + idempotent ingest headers
 - Naming guard to enforce `CircleBox` naming consistency
 
 ## Signals Captured
@@ -74,8 +75,14 @@ On uncaught crash paths:
 - `flutter/circlebox_flutter` - Flutter bridge plugin
 - `flutter/circlebox_adapters` - Flutter companion adapters for Sentry/PostHog forwarding
 - `react-native/circlebox-react-native` - React Native bridge package
+- `react-native/circlebox-cloud-react-native` - React Native cloud companion uploader
 - `integrations/ios/CircleBoxIntegrations` - iOS companion adapters
 - `integrations/android/circlebox-integrations` - Android companion adapters
+- `ios/CircleBoxCloud` - iOS cloud companion uploader
+- `android/circlebox-cloud` - Android cloud companion uploader
+- `flutter/circlebox_cloud_flutter` - Flutter cloud companion uploader
+- `cloud/circlebox-cloud` - Cloud backend workspace (Cloudflare Worker ingest + Supabase metadata + jobs)
+- `cloud/dashboard` - Cloud dashboard frontend (timeline-first)
 - `samples/ios-chaos-app` - iOS sample scaffold
 - `samples/android-chaos-app` - Android sample app
 - `samples/flutter_chaos_app` - Flutter chaos validator app
@@ -253,6 +260,15 @@ xcodegen generate
 open CircleBoxChaosApp.xcodeproj
 ```
 
+## Cloud Deploy Scripts
+
+Worker-first cloud deployment helpers:
+
+- `scripts/check_data_plane_schema.sh`
+- `scripts/deploy_cloud_worker.sh`
+- `scripts/smoke_test_worker_ingest.sh`
+- `scripts/deploy_phase3_cloud.sh`
+
 Manual flow:
 
 1. Trigger multiple mock chaos events
@@ -322,6 +338,7 @@ python3 scripts/decode_persistence.py /absolute/path/to/latest.circlebox
 - `flutter.yml` - Flutter plugin + adapters + chaos sample analyze/tests
 - `react-native.yml` - React Native bridge and sample typecheck
 - `schema-parity.yml` - schema-v2 fixture contract checks
+- `cloud.yml` - Phase 3A cloud/backend/uploader checks
 
 ## Privacy and Safety Defaults
 
