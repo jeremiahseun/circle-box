@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin App and SDK Engineer"
+  short_description: "Build Kotlin UIs, apps, libraries, and SDKs"
+  default_prompt: "Use $kotlin-app-sdk-engineer to design and implement a scalable Kotlin app or SDK."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cloud Backend Production Engineer"
+  short_description: "Build scalable cloud backends and jobs"
+  default_prompt: "Use $cloud-backend-production-engineer to design or improve a production cloud backend with BaaS, jobs, and cron."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Swift App and SDK Engineer"
+  short_description: "Build Swift UIs, apps, libraries, and SDKs"
+  default_prompt: "Use $swift-app-sdk-engineer to design and implement a scalable Swift app or SDK."
