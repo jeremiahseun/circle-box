@@ -30,7 +30,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Pack core tarball
-        run: npm pack --pack-destination ../../artifacts
+        run: |
+          mkdir -p ../../artifacts
+          npm pack --pack-destination ../../artifacts
       - name: Upload core tarball
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +56,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Pack cloud tarball
-        run: npm pack --pack-destination ../../artifacts
+        run: |
+          mkdir -p ../../artifacts
+          npm pack --pack-destination ../../artifacts
       - name: Upload RN tarballs
         uses: actions/upload-artifact@v4
         with:
