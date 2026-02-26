@@ -124,13 +124,25 @@ jobs:
           flutter analyze
           flutter test
           cd ../circlebox_cloud_flutter
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
           flutter pub get
           flutter analyze
           flutter test
+          rm -f pubspec_overrides.yaml
           cd ../circlebox_adapters
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
           flutter pub get
           flutter analyze
           flutter test
+          rm -f pubspec_overrides.yaml
       - name: Package Flutter artifacts
         run: |
           mkdir -p artifacts
@@ -154,13 +166,13 @@ jobs:
       - name: Pack RN core package
         working-directory: react-native/circlebox-react-native
         run: |
-          npm install
+          npm ci --include=dev
           npm run typecheck
           npm pack --pack-destination ../../artifacts
       - name: Pack RN cloud package
         working-directory: react-native/circlebox-cloud-react-native
         run: |
-          npm install
+          npm ci --include=dev
           npm run typecheck
           npm pack --pack-destination ../../artifacts
       - name: Upload RN assets

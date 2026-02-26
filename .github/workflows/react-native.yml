@@ -15,6 +15,8 @@ on:
 jobs:
   bridge-typecheck:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: development
     defaults:
       run:
         working-directory: react-native/circlebox-react-native
@@ -24,7 +26,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --include=dev
       - name: Typecheck
         run: npm run typecheck
       - name: Pack core tarball
@@ -37,6 +39,8 @@ jobs:
 
   cloud-bridge-typecheck:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: development
     defaults:
       run:
         working-directory: react-native/circlebox-cloud-react-native
@@ -46,7 +50,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --include=dev
       - name: Typecheck
         run: npm run typecheck
       - name: Pack cloud tarball
@@ -59,6 +63,8 @@ jobs:
 
   sample-typecheck:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: development
     defaults:
       run:
         working-directory: samples/react-native-chaos-app
@@ -68,6 +74,6 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --include=dev
       - name: Typecheck
         run: npm run typecheck
