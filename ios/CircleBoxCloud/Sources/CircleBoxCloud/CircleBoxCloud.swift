@@ -6,6 +6,14 @@ import CircleBoxSDK
 import UIKit
 #endif
 
+public enum CircleBoxCloudUsageMode: String, Sendable {
+    case offlineOnly = "offline_only"
+    case coreCloud = "core_cloud"
+    case coreAdapters = "core_adapters"
+    case coreCloudAdapters = "core_cloud_adapters"
+    case selfHost = "self_host"
+}
+
 public struct CircleBoxCloudConfig: Sendable {
     public let endpoint: URL
     public let ingestKey: String
@@ -17,6 +25,11 @@ public struct CircleBoxCloudConfig: Sendable {
     public let retryMaxBackoffSec: TimeInterval
     public let enableAutoFlush: Bool
     public let autoExportPendingOnStart: Bool
+    public let enableUsageBeacon: Bool
+    public let usageBeaconKey: String?
+    public let usageBeaconEndpoint: URL?
+    public let usageBeaconMode: CircleBoxCloudUsageMode
+    public let usageBeaconMinIntervalSec: TimeInterval
 
     public init(
         endpoint: URL,
@@ -28,7 +41,12 @@ public struct CircleBoxCloudConfig: Sendable {
         wifiOnly: Bool = false,
         retryMaxBackoffSec: TimeInterval = 900,
         enableAutoFlush: Bool = true,
-        autoExportPendingOnStart: Bool = true
+        autoExportPendingOnStart: Bool = true,
+        enableUsageBeacon: Bool = false,
+        usageBeaconKey: String? = nil,
+        usageBeaconEndpoint: URL? = nil,
+        usageBeaconMode: CircleBoxCloudUsageMode = .coreCloud,
+        usageBeaconMinIntervalSec: TimeInterval = 300
     ) {
         self.endpoint = endpoint
         self.ingestKey = ingestKey
@@ -40,6 +58,11 @@ public struct CircleBoxCloudConfig: Sendable {
         self.retryMaxBackoffSec = max(30, retryMaxBackoffSec)
         self.enableAutoFlush = enableAutoFlush
         self.autoExportPendingOnStart = autoExportPendingOnStart
+        self.enableUsageBeacon = enableUsageBeacon
+        self.usageBeaconKey = usageBeaconKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.usageBeaconEndpoint = usageBeaconEndpoint
+        self.usageBeaconMode = usageBeaconMode
+        self.usageBeaconMinIntervalSec = max(30, usageBeaconMinIntervalSec)
     }
 }
 
@@ -61,13 +84,38 @@ private enum CircleBoxCloudUploadOutcome {
     case permanent
 }
 
+private struct CircleBoxCloudUsageBeaconState: Codable, Sendable {
+    var usageDate: String
+    var activeApps: Int64
+    var crashReports: Int64
+    var eventsEmitted: Int64
+    var lastSentUnixMs: Int64
+
+    enum CodingKeys: String, CodingKey {
+        case usageDate = "usage_date"
+        case activeApps = "active_apps"
+        case crashReports = "crash_reports"
+        case eventsEmitted = "events_emitted"
+        case lastSentUnixMs = "last_sent_unix_ms"
+    }
+}
+
+private struct CircleBoxCloudUsageSummaryIncrement: Sendable {
+    let crashReports: Int64
+    let eventsEmitted: Int64
+}
+
 public enum CircleBoxCloud {
+    private static let sdkVersion = "0.3.1"
     private static let stateQueue = DispatchQueue(label: "com.circlebox.cloud.uploader.state")
     private static var config: CircleBoxCloudConfig?
     private static var paused = false
     private static var uploadQueue: [CircleBoxCloudUploadTask] = []
     private static var queueLoaded = false
     private static var isProcessingQueue = false
+    private static var usageBeaconStateLoaded = false
+    private static var usageBeaconState: CircleBoxCloudUsageBeaconState?
+    private static var isSendingUsageBeacon = false
     private static var autoFlushTimer: DispatchSourceTimer?
     private static var isAppActive = true
 
@@ -81,6 +129,9 @@ public enum CircleBoxCloud {
             self.config = config
             self.paused = false
             try? ensureQueueLoadedLocked()
+            try? ensureUsageBeaconStateLoadedLocked()
+            recordUsageAppStartLocked()
+            try? persistUsageBeaconStateLocked()
             updateForegroundStateLocked()
             configureAutoFlushLocked()
         }
@@ -148,12 +199,14 @@ public enum CircleBoxCloud {
 
         if checkPendingCrash && CircleBox.hasPendingCrashReport() {
             _ = try? await flush()
+            await sendUsageBeaconIfNeeded(force: false)
             return
         }
 
         if localConfig.enableAutoFlush {
             await processQueueIfNeeded()
         }
+        await sendUsageBeaconIfNeeded(force: false)
     }
 
     private static func processQueueIfNeeded() async {
@@ -193,6 +246,10 @@ public enum CircleBoxCloud {
                 continue
             }
 
+            let summaryIncrement = task.endpointPath == "v1/ingest/fragment"
+                ? parseUsageSummaryIncrement(from: payload)
+                : nil
+
             let outcome = await uploadOnce(
                 session: session,
                 config: localConfig,
@@ -204,12 +261,22 @@ public enum CircleBoxCloud {
                 switch outcome {
                 case .success:
                     removeTaskLocked(id: task.id)
+                    if let summaryIncrement {
+                        applyUsageSummaryIncrementLocked(summaryIncrement)
+                    }
                 case .retryable:
                     rescheduleTaskLocked(id: task.id, retryMaxBackoffSec: localConfig.retryMaxBackoffSec)
                 case .permanent:
                     removeTaskLocked(id: task.id)
                 }
                 try? persistQueueLocked()
+                if case .success = outcome, summaryIncrement != nil {
+                    try? persistUsageBeaconStateLocked()
+                }
+            }
+
+            if case .success = outcome, summaryIncrement != nil {
+                await sendUsageBeaconIfNeeded(force: false)
             }
         }
     }
@@ -438,6 +505,204 @@ public enum CircleBoxCloud {
         try fileManager.createDirectory(at: cloudDirectory, withIntermediateDirectories: true)
         return cloudDirectory.appendingPathComponent("upload-queue.json", isDirectory: false)
     }
+
+    private static func usageBeaconStateFileURLLocked() throws -> URL {
+        try queueFileURLLocked()
+            .deletingLastPathComponent()
+            .appendingPathComponent("usage-beacon-state.json", isDirectory: false)
+    }
+
+    private static func ensureUsageBeaconStateLoadedLocked() throws {
+        guard !usageBeaconStateLoaded else { return }
+        defer { usageBeaconStateLoaded = true }
+
+        let fileURL = try usageBeaconStateFileURLLocked()
+        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else {
+            usageBeaconState = defaultUsageBeaconStateLocked()
+            return
+        }
+
+        if let decoded = try? JSONDecoder().decode(CircleBoxCloudUsageBeaconState.self, from: data) {
+            usageBeaconState = normalizedUsageStateLocked(decoded)
+        } else {
+            usageBeaconState = defaultUsageBeaconStateLocked()
+        }
+    }
+
+    private static func persistUsageBeaconStateLocked() throws {
+        guard let usageBeaconState else { return }
+        let fileURL = try usageBeaconStateFileURLLocked()
+        let data = try JSONEncoder().encode(usageBeaconState)
+        try data.write(to: fileURL, options: [.atomic])
+    }
+
+    private static func recordUsageAppStartLocked() {
+        guard let config, config.enableUsageBeacon else { return }
+        var state = usageBeaconState ?? defaultUsageBeaconStateLocked()
+        state = normalizedUsageStateLocked(state)
+        state.activeApps = state.activeApps &+ 1
+        usageBeaconState = state
+    }
+
+    private static func applyUsageSummaryIncrementLocked(_ increment: CircleBoxCloudUsageSummaryIncrement) {
+        guard let config, config.enableUsageBeacon else { return }
+        var state = usageBeaconState ?? defaultUsageBeaconStateLocked()
+        state = normalizedUsageStateLocked(state)
+        state.crashReports = state.crashReports &+ max(0, increment.crashReports)
+        state.eventsEmitted = state.eventsEmitted &+ max(0, increment.eventsEmitted)
+        usageBeaconState = state
+    }
+
+    private static func sendUsageBeaconIfNeeded(force: Bool) async {
+        let snapshot: (url: URL, key: String, mode: String, state: CircleBoxCloudUsageBeaconState)?
+        snapshot = stateQueue.sync {
+            guard let config, config.enableUsageBeacon else { return nil }
+            guard !isSendingUsageBeacon else { return nil }
+            guard let key = config.usageBeaconKey?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else {
+                return nil
+            }
+
+            let minIntervalMs = Int64(config.usageBeaconMinIntervalSec * 1000)
+            var state = usageBeaconState ?? defaultUsageBeaconStateLocked()
+            state = normalizedUsageStateLocked(state)
+            let now = nowMs()
+            if !force && (now - state.lastSentUnixMs) < minIntervalMs {
+                usageBeaconState = state
+                return nil
+            }
+
+            usageBeaconState = state
+            isSendingUsageBeacon = true
+
+            let base = config.usageBeaconEndpoint ?? config.endpoint
+            let endpoint = base.appendingPathComponent("v1/telemetry/usage")
+            return (endpoint, key, config.usageBeaconMode.rawValue, state)
+        }
+
+        guard let snapshot else { return }
+
+        var request = URLRequest(url: snapshot.url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 10
+        request.setValue(snapshot.key, forHTTPHeaderField: "x-circlebox-usage-key")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+
+        let body: [String: Any] = [
+            "sdk_family": "ios",
+            "sdk_version": sdkVersion,
+            "mode": snapshot.mode,
+            "usage_date": snapshot.state.usageDate,
+            "active_apps": snapshot.state.activeApps,
+            "crash_reports": snapshot.state.crashReports,
+            "events_emitted": snapshot.state.eventsEmitted
+        ]
+        guard let payload = try? JSONSerialization.data(withJSONObject: body, options: []) else {
+            stateQueue.sync {
+                isSendingUsageBeacon = false
+            }
+            return
+        }
+        request.httpBody = payload
+
+        let session = URLSession(configuration: .ephemeral)
+        var success = false
+        do {
+            let (_, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                success = true
+            }
+        } catch {
+            success = false
+        }
+
+        stateQueue.sync {
+            defer { isSendingUsageBeacon = false }
+            if success {
+                var state = usageBeaconState ?? defaultUsageBeaconStateLocked()
+                state = normalizedUsageStateLocked(state)
+                state.lastSentUnixMs = nowMs()
+                usageBeaconState = state
+                try? persistUsageBeaconStateLocked()
+            }
+        }
+    }
+
+    private static func parseUsageSummaryIncrement(from payload: Data) -> CircleBoxCloudUsageSummaryIncrement? {
+        guard let object = try? JSONSerialization.jsonObject(with: payload, options: []) as? [String: Any] else {
+            return nil
+        }
+        let totalEvents = max(0, int64Value(from: object["total_events"]))
+        let crashEventPresent = boolValue(from: object["crash_event_present"])
+        return CircleBoxCloudUsageSummaryIncrement(
+            crashReports: crashEventPresent ? 1 : 0,
+            eventsEmitted: totalEvents
+        )
+    }
+
+    private static func int64Value(from raw: Any?) -> Int64 {
+        switch raw {
+        case let value as Int:
+            return Int64(value)
+        case let value as Int64:
+            return value
+        case let value as NSNumber:
+            return value.int64Value
+        case let value as String:
+            return Int64(value) ?? 0
+        default:
+            return 0
+        }
+    }
+
+    private static func boolValue(from raw: Any?) -> Bool {
+        switch raw {
+        case let value as Bool:
+            return value
+        case let value as NSNumber:
+            return value.boolValue
+        case let value as String:
+            return (value as NSString).boolValue
+        default:
+            return false
+        }
+    }
+
+    private static func defaultUsageBeaconStateLocked() -> CircleBoxCloudUsageBeaconState {
+        CircleBoxCloudUsageBeaconState(
+            usageDate: currentUsageDateStringLocked(),
+            activeApps: 0,
+            crashReports: 0,
+            eventsEmitted: 0,
+            lastSentUnixMs: 0
+        )
+    }
+
+    private static func normalizedUsageStateLocked(_ state: CircleBoxCloudUsageBeaconState) -> CircleBoxCloudUsageBeaconState {
+        let today = currentUsageDateStringLocked()
+        guard state.usageDate == today else {
+            return CircleBoxCloudUsageBeaconState(
+                usageDate: today,
+                activeApps: 0,
+                crashReports: 0,
+                eventsEmitted: 0,
+                lastSentUnixMs: 0
+            )
+        }
+        return state
+    }
+
+    private static func currentUsageDateStringLocked() -> String {
+        usageDateFormatter.string(from: Date())
+    }
+
+    private static let usageDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private static func nowMs() -> Int64 {
         Int64(Date().timeIntervalSince1970 * 1000)

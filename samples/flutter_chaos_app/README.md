@@ -10,6 +10,19 @@ flutter pub get
 flutter run
 ```
 
+## Optional Cloud Uploader (Real Dashboard Flow)
+
+Pass runtime values via `--dart-define`:
+
+```bash
+flutter run \
+  --dart-define=CIRCLEBOX_WORKER_BASE_URL=https://circlebox.seunjeremiah.workers.dev \
+  --dart-define=CIRCLEBOX_INGEST_KEY=cb_live_<project_key> \
+  --dart-define=CIRCLEBOX_USAGE_KEY=cb_usage_<project_key>
+```
+
+If endpoint + ingest key are provided, the app starts `CircleBoxCloud` and auto-uploads pending crash exports.
+
 ## Validation Flow
 
 1. Trigger mock context actions (`thermal`, `battery`, `network`, `permission`, `disk`, breadcrumb).

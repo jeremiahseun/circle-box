@@ -47,6 +47,24 @@ jobs:
           npm install
           npm run typecheck
 
+      - name: Worker ingest smoke (optional when secrets are set)
+        if: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL != '' && secrets.CIRCLEBOX_SMOKE_INGEST_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_ingest.sh \
+            --base-url "${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --dashboard-token "${{ secrets.DASHBOARD_WORKER_TOKEN }}" \
+            --skip-download-check
+
+      - name: Worker usage/key-auth smoke (optional when control-plane secrets are set)
+        if: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL != '' && secrets.CIRCLEBOX_SMOKE_INGEST_KEY != '' && secrets.CONTROL_SUPABASE_URL != '' && secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_usage_telemetry.sh \
+            --base-url "${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --control-url "${{ secrets.CONTROL_SUPABASE_URL }}" \
+            --control-service-role "${{ secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}"
+
   ios-cloud:
     runs-on: macos-latest
     defaults:

@@ -7,7 +7,7 @@ Companion uploader package for CircleBox Cloud.
 Use the root repository package:
 
 ```swift
-.package(url: "https://github.com/jeremiahseun/circlebox.git", from: "0.3.0")
+.package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")
 ```
 
 Then add product dependency: `CircleBoxCloud`.
@@ -22,7 +22,10 @@ CircleBoxCloud.start(
         endpoint: URL(string: "https://api.circlebox.dev")!,
         ingestKey: "cb_live_project_key",
         enableAutoFlush: true,
-        autoExportPendingOnStart: true
+        autoExportPendingOnStart: true,
+        enableUsageBeacon: true,
+        usageBeaconKey: "cb_usage_project_key",
+        usageBeaconMode: .coreCloud
     )
 )
 
@@ -42,3 +45,13 @@ Behavior:
 - Automatically checks pending crash reports on start and foreground resume
 - Automatically drains queued uploads on `flushIntervalSec` while app is active
 - Automatic mode drains queue only; it does not create periodic live snapshots
+- Optional usage-beacon telemetry (`/v1/telemetry/usage`) is opt-in via `enableUsageBeacon` + `usageBeaconKey`
+- For self-host ingest, set `usageBeaconEndpoint` to CircleBox Worker to keep aggregate usage reporting enabled
+
+## Standalone Validation
+
+From this directory:
+
+```bash
+./scripts/package_check.sh
+```

@@ -8,6 +8,10 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -22,6 +26,9 @@ import org.json.JSONObject
  * Android companion uploader for CircleBox Cloud.
  */
 object CircleBoxCloud {
+    private const val SDK_VERSION = "0.3.1"
+    private const val USAGE_STATE_FILE_NAME = "usage-beacon-state.json"
+
     @Volatile
     private var config: CircleBoxCloudConfig? = null
     private val paused = AtomicBoolean(false)
@@ -30,8 +37,13 @@ object CircleBoxCloud {
     private var queueLoaded = false
     private var queueFile: File? = null
     private var isProcessingQueue = false
+    private var usageStateLoaded = false
+    private var usageStateFile: File? = null
+    private var usageBeaconState: UsageBeaconState? = null
     private var lifecycleObserver: DefaultLifecycleObserver? = null
     private var appInForeground = true
+    @Volatile
+    private var isSendingUsageBeacon = false
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "circlebox-cloud-scheduler").apply {
             isDaemon = true
@@ -57,6 +69,19 @@ object CircleBoxCloud {
         PERMANENT,
     }
 
+    private data class UsageBeaconState(
+        val usageDate: String,
+        val activeApps: Long,
+        val crashReports: Long,
+        val eventsEmitted: Long,
+        val lastSentUnixMs: Long,
+    )
+
+    private data class UsageSummaryIncrement(
+        val crashReports: Long,
+        val eventsEmitted: Long,
+    )
+
     fun start(config: CircleBoxCloudConfig) {
         this.config = config
         paused.set(false)
@@ -64,6 +89,10 @@ object CircleBoxCloud {
         synchronized(lock) {
             resolveQueueFileLocked(emptyList())
             ensureQueueLoadedLocked()
+            resolveUsageStateFileLocked()
+            ensureUsageStateLoadedLocked()
+            recordUsageStartLocked(config)
+            saveUsageStateLocked()
             appInForeground = true
             registerLifecycleObserverLocked()
             configurePeriodicFlushLocked(config)
@@ -136,6 +165,8 @@ object CircleBoxCloud {
         if (localConfig.enableAutoFlush) {
             processQueueIfNeeded(localConfig)
         }
+
+        sendUsageBeaconIfNeeded(localConfig, force = false)
     }
 
     private fun registerLifecycleObserverLocked() {
@@ -283,6 +314,11 @@ object CircleBoxCloud {
                 }
 
                 val endpoint = combineEndpoint(localConfig.endpoint, task.endpointPath)
+                val summaryIncrement = if (task.endpointPath == "v1/ingest/fragment") {
+                    parseUsageSummaryIncrement(payload)
+                } else {
+                    null
+                }
                 val outcome = uploadOnce(
                     ingestKey = localConfig.ingestKey,
                     endpoint = endpoint,
@@ -293,11 +329,21 @@ object CircleBoxCloud {
 
                 synchronized(lock) {
                     when (outcome) {
-                        UploadOutcome.SUCCESS -> removeTaskLocked(task.id)
+                        UploadOutcome.SUCCESS -> {
+                            removeTaskLocked(task.id)
+                            if (summaryIncrement != null) {
+                                applyUsageSummaryIncrementLocked(localConfig, summaryIncrement)
+                                saveUsageStateLocked()
+                            }
+                        }
                         UploadOutcome.RETRYABLE -> rescheduleTaskLocked(task.id, localConfig.retryMaxBackoffSec)
                         UploadOutcome.PERMANENT -> removeTaskLocked(task.id)
                     }
                     saveQueueLocked()
+                }
+
+                if (outcome == UploadOutcome.SUCCESS && summaryIncrement != null) {
+                    sendUsageBeaconIfNeeded(localConfig, force = false)
                 }
             }
         } finally {
@@ -396,6 +442,15 @@ object CircleBoxCloud {
         queueLoaded = false
     }
 
+    private fun resolveUsageStateFileLocked() {
+        if (usageStateFile != null) {
+            return
+        }
+        val queue = queueFile ?: return
+        usageStateFile = File(queue.parentFile ?: return, USAGE_STATE_FILE_NAME)
+        usageStateLoaded = false
+    }
+
     private fun resolveCircleBoxBaseDirFromContext(): File? {
         return runCatching {
             val circleBoxClass = Class.forName("com.circlebox.sdk.CircleBox")
@@ -464,6 +519,159 @@ object CircleBoxCloud {
         }
     }
 
+    private fun ensureUsageStateLoadedLocked() {
+        if (usageStateLoaded) {
+            return
+        }
+        usageStateLoaded = true
+        val file = usageStateFile ?: return
+        val raw = runCatching { file.readText() }.getOrNull()
+        usageBeaconState = if (raw.isNullOrBlank()) {
+            defaultUsageState()
+        } else {
+            runCatching {
+                val item = JSONObject(raw)
+                UsageBeaconState(
+                    usageDate = item.optString("usage_date", currentUsageDate()),
+                    activeApps = item.optLong("active_apps", 0L).coerceAtLeast(0L),
+                    crashReports = item.optLong("crash_reports", 0L).coerceAtLeast(0L),
+                    eventsEmitted = item.optLong("events_emitted", 0L).coerceAtLeast(0L),
+                    lastSentUnixMs = item.optLong("last_sent_unix_ms", 0L).coerceAtLeast(0L),
+                )
+            }.getOrElse { defaultUsageState() }
+        }
+        usageBeaconState = normalizeUsageState(usageBeaconState ?: defaultUsageState())
+    }
+
+    private fun saveUsageStateLocked() {
+        val state = usageBeaconState ?: return
+        val file = usageStateFile ?: return
+        val serialized = JSONObject()
+            .put("usage_date", state.usageDate)
+            .put("active_apps", state.activeApps)
+            .put("crash_reports", state.crashReports)
+            .put("events_emitted", state.eventsEmitted)
+            .put("last_sent_unix_ms", state.lastSentUnixMs)
+            .toString()
+        runCatching {
+            file.parentFile?.mkdirs()
+            file.writeText(serialized)
+        }
+    }
+
+    private fun recordUsageStartLocked(localConfig: CircleBoxCloudConfig) {
+        if (!localConfig.enableUsageBeacon) {
+            return
+        }
+        ensureUsageStateLoadedLocked()
+        val current = normalizeUsageState(usageBeaconState ?: defaultUsageState())
+        usageBeaconState = current.copy(activeApps = current.activeApps + 1)
+    }
+
+    private fun applyUsageSummaryIncrementLocked(
+        localConfig: CircleBoxCloudConfig,
+        increment: UsageSummaryIncrement,
+    ) {
+        if (!localConfig.enableUsageBeacon) {
+            return
+        }
+        ensureUsageStateLoadedLocked()
+        val current = normalizeUsageState(usageBeaconState ?: defaultUsageState())
+        usageBeaconState = current.copy(
+            crashReports = current.crashReports + increment.crashReports.coerceAtLeast(0L),
+            eventsEmitted = current.eventsEmitted + increment.eventsEmitted.coerceAtLeast(0L),
+        )
+    }
+
+    private fun sendUsageBeaconIfNeeded(localConfig: CircleBoxCloudConfig, force: Boolean) {
+        data class RequestPayload(
+            val endpoint: String,
+            val usageKey: String,
+            val state: UsageBeaconState,
+        )
+
+        val request = synchronized(lock) {
+            if (!localConfig.enableUsageBeacon || isSendingUsageBeacon) {
+                return@synchronized null
+            }
+            val usageKey = localConfig.usageBeaconKey?.trim().orEmpty()
+            if (usageKey.isEmpty()) {
+                return@synchronized null
+            }
+
+            ensureUsageStateLoadedLocked()
+            val state = normalizeUsageState(usageBeaconState ?: defaultUsageState())
+            val minIntervalMs = localConfig.usageBeaconMinIntervalSec * 1000
+            val now = nowMs()
+            if (!force && (now - state.lastSentUnixMs) < minIntervalMs) {
+                usageBeaconState = state
+                return@synchronized null
+            }
+
+            usageBeaconState = state
+            isSendingUsageBeacon = true
+            val base = localConfig.usageBeaconEndpoint?.takeIf { it.isNotBlank() } ?: localConfig.endpoint
+            RequestPayload(
+                endpoint = combineEndpoint(base, "v1/telemetry/usage"),
+                usageKey = usageKey,
+                state = state,
+            )
+        } ?: return
+
+        val connection = URL(request.endpoint).openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        connection.setRequestProperty("x-circlebox-usage-key", request.usageKey)
+        connection.setRequestProperty("content-type", "application/json")
+        connection.doOutput = true
+
+        var success = false
+        try {
+            val body = JSONObject()
+                .put("sdk_family", "android")
+                .put("sdk_version", SDK_VERSION)
+                .put("mode", localConfig.usageBeaconMode.wireValue)
+                .put("usage_date", request.state.usageDate)
+                .put("active_apps", request.state.activeApps)
+                .put("crash_reports", request.state.crashReports)
+                .put("events_emitted", request.state.eventsEmitted)
+                .toString()
+
+            connection.outputStream.use { output ->
+                output.write(body.toByteArray(Charsets.UTF_8))
+                output.flush()
+            }
+
+            val code = connection.responseCode
+            success = code in 200..299
+        } catch (_: Throwable) {
+            success = false
+        } finally {
+            connection.disconnect()
+            synchronized(lock) {
+                if (success) {
+                    val current = normalizeUsageState(usageBeaconState ?: defaultUsageState())
+                    usageBeaconState = current.copy(lastSentUnixMs = nowMs())
+                    saveUsageStateLocked()
+                }
+                isSendingUsageBeacon = false
+            }
+        }
+    }
+
+    private fun parseUsageSummaryIncrement(payload: ByteArray): UsageSummaryIncrement? {
+        return runCatching {
+            val decoded = JSONObject(payload.toString(Charsets.UTF_8))
+            val totalEvents = decoded.optLong("total_events", 0L).coerceAtLeast(0L)
+            val crashPresent = decoded.optBoolean("crash_event_present", false)
+            UsageSummaryIncrement(
+                crashReports = if (crashPresent) 1 else 0,
+                eventsEmitted = totalEvents,
+            )
+        }.getOrNull()
+    }
+
     private fun nextReadyTaskLocked(): UploadTask? {
         val now = nowMs()
         return uploadQueue
@@ -522,6 +730,30 @@ object CircleBoxCloud {
     }
 
     private fun nowMs(): Long = System.currentTimeMillis()
+
+    private fun defaultUsageState(): UsageBeaconState {
+        return UsageBeaconState(
+            usageDate = currentUsageDate(),
+            activeApps = 0,
+            crashReports = 0,
+            eventsEmitted = 0,
+            lastSentUnixMs = 0,
+        )
+    }
+
+    private fun normalizeUsageState(state: UsageBeaconState): UsageBeaconState {
+        val today = currentUsageDate()
+        if (state.usageDate == today) {
+            return state
+        }
+        return defaultUsageState()
+    }
+
+    private fun currentUsageDate(): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        formatter.timeZone = TimeZone.getTimeZone("UTC")
+        return formatter.format(Date())
+    }
 
     private fun ByteArray.toHex(): String = joinToString(separator = "") { byte ->
         "%02x".format(byte)

@@ -5,9 +5,11 @@ Companion uploader for sending CircleBox exports to CircleBox Cloud.
 ## Install (release tarball)
 
 ```bash
-npm install ./circlebox-react-native-0.3.0.tgz
-npm install ./circlebox-cloud-react-native-0.3.0.tgz
+npm install ./circlebox-react-native-0.3.1.tgz
+npm install ./circlebox-cloud-react-native-0.3.1.tgz
 ```
+
+`circlebox-react-native` is a required peer dependency and must be installed before this package.
 
 ## Usage
 
@@ -19,6 +21,9 @@ await CircleBoxCloud.start({
   ingestKey: 'cb_live_project_key',
   enableAutoFlush: true,
   autoExportPendingOnStart: true,
+  enableUsageBeacon: true,
+  usageBeaconKey: 'cb_usage_project_key',
+  usageBeaconMode: 'core_cloud',
 });
 
 await CircleBoxCloud.setUser('user-123');
@@ -34,3 +39,13 @@ Behavior:
 - Automatically checks pending crash reports on startup and app foreground transitions
 - Automatically drains queued uploads on `flushIntervalSec` while app is active
 - Automatic mode drains queue only; it does not create periodic live snapshots
+- Optional usage-beacon telemetry (`/v1/telemetry/usage`) is opt-in via `enableUsageBeacon` + `usageBeaconKey`
+- For self-host ingest, set `usageBeaconEndpoint` to CircleBox Worker to keep aggregate usage reporting enabled
+
+## Standalone Validation
+
+From this directory:
+
+```bash
+./scripts/package_check.sh
+```

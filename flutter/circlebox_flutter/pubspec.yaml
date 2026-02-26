@@ -1,6 +1,6 @@
 name: circlebox_flutter
 description: Flutter bridge for CircleBox native crash context SDK.
-version: 0.3.0
+version: 0.3.1
 homepage: https://github.com/jeremiahseun/circlebox
 repository: https://github.com/jeremiahseun/circlebox
 issue_tracker: https://github.com/jeremiahseun/circlebox/issues

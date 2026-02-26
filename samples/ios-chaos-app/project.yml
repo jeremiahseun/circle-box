@@ -5,6 +5,8 @@ options:
 packages:
   CircleBoxSDK:
     path: ../../ios/CircleBoxSDK
+  CircleBoxCloud:
+    path: ../../ios/CircleBoxCloud
 targets:
   CircleBoxChaosApp:
     type: application
@@ -24,3 +26,4 @@ targets:
         SWIFT_VERSION: 5.9
     dependencies:
       - package: CircleBoxSDK
+      - package: CircleBoxCloud

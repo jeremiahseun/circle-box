@@ -9,7 +9,7 @@ order: 2
 Add the repository as a Swift Package dependency:
 
 ```swift
-.package(url: "https://github.com/jeremiahseun/circlebox.git", from: "0.3.0")
+.package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")
 ```
 
 Select products:
@@ -44,7 +44,7 @@ import CircleBoxCloud
 CircleBoxCloud.start(
   config: CircleBoxCloudConfig(
     endpoint: URL(string: "https://circlebox.seunjeremiah.workers.dev")!,
-    ingestKey: "cb_live_<project_uuid>_us_<secret>"
+    ingestKey: "paste_ingest_key_from_control_plane"
   )
 )
 ```

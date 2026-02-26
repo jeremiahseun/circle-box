@@ -3,6 +3,13 @@ import { CircleBox, type CircleBoxExportFormat } from 'circlebox-react-native';
 
 declare const require: (name: string) => unknown;
 
+export type CircleBoxCloudUsageMode =
+  | 'offline_only'
+  | 'core_cloud'
+  | 'core_adapters'
+  | 'core_cloud_adapters'
+  | 'self_host';
+
 export type CircleBoxCloudConfig = {
   endpoint: string;
   ingestKey: string;
@@ -14,6 +21,11 @@ export type CircleBoxCloudConfig = {
   retryMaxBackoffSec?: number;
   enableAutoFlush?: boolean;
   autoExportPendingOnStart?: boolean;
+  enableUsageBeacon?: boolean;
+  usageBeaconKey?: string;
+  usageBeaconEndpoint?: string;
+  usageBeaconMode?: CircleBoxCloudUsageMode;
+  usageBeaconMinIntervalSec?: number;
 };
 
 type UploadTask = {
@@ -29,6 +41,21 @@ type UploadTask = {
 };
 
 const QUEUE_STORAGE_KEY = 'circlebox_cloud_upload_queue_v1';
+const USAGE_STATE_STORAGE_KEY = 'circlebox_cloud_usage_beacon_state_v1';
+const SDK_VERSION = '0.3.1';
+
+type UsageBeaconState = {
+  usageDate: string;
+  activeApps: number;
+  crashReports: number;
+  eventsEmitted: number;
+  lastSentUnixMs: number;
+};
+
+type UsageSummaryIncrement = {
+  crashReports: number;
+  eventsEmitted: number;
+};
 
 type StorageLike = {
   getItem: (key: string) => Promise<string | null>;
@@ -38,7 +65,9 @@ type StorageLike = {
 let config: CircleBoxCloudConfig | null = null;
 let paused = false;
 let queueCache: UploadTask[] | null = null;
+let usageStateCache: UsageBeaconState | null = null;
 let isProcessingQueue = false;
+let isSendingUsageBeacon = false;
 let appState: AppStateStatus = AppState.currentState ?? 'active';
 let appStateSubscription: { remove: () => void } | null = null;
 let flushIntervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -54,10 +83,16 @@ export async function start(nextConfig: CircleBoxCloudConfig): Promise<void> {
     retryMaxBackoffSec: 900,
     enableAutoFlush: true,
     autoExportPendingOnStart: true,
+    enableUsageBeacon: false,
+    usageBeaconMode: 'core_cloud',
+    usageBeaconMinIntervalSec: 300,
     ...nextConfig,
   };
   paused = false;
   await loadQueue();
+  await loadUsageState();
+  recordUsageStart(config);
+  await saveUsageState(usageStateCache ?? defaultUsageState());
   ensureAppStateListener();
   configureAutoFlushTimer();
   await runForegroundDrain(Boolean(config.autoExportPendingOnStart));
@@ -118,6 +153,7 @@ async function runForegroundDrain(checkPendingCrash: boolean): Promise<void> {
       } catch {
         // Keep background behavior non-throwing.
       }
+      await sendUsageBeaconIfNeeded(false, localConfig);
       return;
     }
   }
@@ -125,6 +161,7 @@ async function runForegroundDrain(checkPendingCrash: boolean): Promise<void> {
   if (localConfig.enableAutoFlush) {
     await processQueue(localConfig);
   }
+  await sendUsageBeaconIfNeeded(false, localConfig);
 }
 
 function ensureAppStateListener(): void {
@@ -231,6 +268,11 @@ async function processQueue(localConfig: CircleBoxCloudConfig): Promise<void> {
         continue;
       }
 
+      const summaryIncrement =
+        task.endpointPath === 'v1/ingest/fragment'
+          ? parseUsageSummaryIncrement(payload.bytes)
+          : null;
+
       const endpoint = combineEndpoint(localConfig.endpoint, task.endpointPath);
       // eslint-disable-next-line no-await-in-loop
       const outcome = await uploadOnce(
@@ -243,6 +285,11 @@ async function processQueue(localConfig: CircleBoxCloudConfig): Promise<void> {
 
       if (outcome === 'success') {
         removeTask(queue, task.id);
+        if (summaryIncrement) {
+          applyUsageSummaryIncrement(localConfig, summaryIncrement);
+          // eslint-disable-next-line no-await-in-loop
+          await saveUsageState(usageStateCache ?? defaultUsageState());
+        }
       } else if (outcome === 'retryable') {
         rescheduleTask(queue, task.id, localConfig.retryMaxBackoffSec ?? 900);
       } else {
@@ -251,6 +298,10 @@ async function processQueue(localConfig: CircleBoxCloudConfig): Promise<void> {
 
       // eslint-disable-next-line no-await-in-loop
       await saveQueue(queue);
+      if (outcome === 'success' && summaryIncrement) {
+        // eslint-disable-next-line no-await-in-loop
+        await sendUsageBeaconIfNeeded(false, localConfig);
+      }
     }
   } finally {
     isProcessingQueue = false;
@@ -412,6 +463,197 @@ function stringToBytes(value: string): Uint8Array {
   const out = new Uint8Array(value.length);
   for (let i = 0; i < value.length; i += 1) {
     out[i] = value.charCodeAt(i) & 0xff;
+  }
+  return out;
+}
+
+async function sendUsageBeaconIfNeeded(
+  force: boolean,
+  localConfig: CircleBoxCloudConfig | null = config,
+): Promise<void> {
+  if (
+    !localConfig ||
+    isSendingUsageBeacon ||
+    !localConfig.enableUsageBeacon ||
+    !localConfig.usageBeaconKey ||
+    localConfig.usageBeaconKey.trim().length === 0
+  ) {
+    return;
+  }
+
+  const state = normalizeUsageState(usageStateCache ?? defaultUsageState());
+  usageStateCache = state;
+  const minIntervalMs = Math.max(30, localConfig.usageBeaconMinIntervalSec ?? 300) * 1000;
+  if (!force && nowMs() - state.lastSentUnixMs < minIntervalMs) {
+    return;
+  }
+
+  isSendingUsageBeacon = true;
+  const endpoint = combineEndpoint(localConfig.usageBeaconEndpoint ?? localConfig.endpoint, 'v1/telemetry/usage');
+
+  let success = false;
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'x-circlebox-usage-key': localConfig.usageBeaconKey.trim(),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sdk_family: 'react_native',
+        sdk_version: SDK_VERSION,
+        mode: normalizeUsageMode(localConfig.usageBeaconMode),
+        usage_date: state.usageDate,
+        active_apps: state.activeApps,
+        crash_reports: state.crashReports,
+        events_emitted: state.eventsEmitted,
+      }),
+    });
+    success = response.ok;
+  } catch {
+    success = false;
+  } finally {
+    isSendingUsageBeacon = false;
+  }
+
+  if (success) {
+    usageStateCache = {
+      ...state,
+      lastSentUnixMs: nowMs(),
+    };
+    await saveUsageState(usageStateCache);
+  }
+}
+
+function parseUsageSummaryIncrement(bytes: Uint8Array): UsageSummaryIncrement | null {
+  try {
+    const decoded = JSON.parse(bytesToString(bytes)) as Record<string, unknown>;
+    const totalEventsRaw = decoded.total_events;
+    const totalEvents =
+      typeof totalEventsRaw === 'number' && Number.isFinite(totalEventsRaw)
+        ? Math.max(0, Math.floor(totalEventsRaw))
+        : 0;
+    const crashReports = decoded.crash_event_present === true ? 1 : 0;
+    return {
+      crashReports,
+      eventsEmitted: totalEvents,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function applyUsageSummaryIncrement(
+  localConfig: CircleBoxCloudConfig,
+  increment: UsageSummaryIncrement,
+): void {
+  if (!localConfig.enableUsageBeacon) {
+    return;
+  }
+  const current = normalizeUsageState(usageStateCache ?? defaultUsageState());
+  usageStateCache = {
+    ...current,
+    crashReports: current.crashReports + Math.max(0, increment.crashReports),
+    eventsEmitted: current.eventsEmitted + Math.max(0, increment.eventsEmitted),
+  };
+}
+
+function recordUsageStart(localConfig: CircleBoxCloudConfig): void {
+  if (!localConfig.enableUsageBeacon) {
+    return;
+  }
+  const current = normalizeUsageState(usageStateCache ?? defaultUsageState());
+  usageStateCache = {
+    ...current,
+    activeApps: current.activeApps + 1,
+  };
+}
+
+async function loadUsageState(): Promise<UsageBeaconState> {
+  if (usageStateCache) {
+    return usageStateCache;
+  }
+
+  if (!storage) {
+    usageStateCache = defaultUsageState();
+    return usageStateCache;
+  }
+
+  const raw = await storage.getItem(USAGE_STATE_STORAGE_KEY);
+  if (!raw) {
+    usageStateCache = defaultUsageState();
+    return usageStateCache;
+  }
+
+  try {
+    const decoded = JSON.parse(raw) as unknown;
+    if (!decoded || typeof decoded !== 'object') {
+      usageStateCache = defaultUsageState();
+      return usageStateCache;
+    }
+    const obj = decoded as Record<string, unknown>;
+    usageStateCache = normalizeUsageState({
+      usageDate: typeof obj.usageDate === 'string' ? obj.usageDate : currentUsageDate(),
+      activeApps: typeof obj.activeApps === 'number' ? Math.max(0, Math.floor(obj.activeApps)) : 0,
+      crashReports: typeof obj.crashReports === 'number' ? Math.max(0, Math.floor(obj.crashReports)) : 0,
+      eventsEmitted: typeof obj.eventsEmitted === 'number' ? Math.max(0, Math.floor(obj.eventsEmitted)) : 0,
+      lastSentUnixMs:
+        typeof obj.lastSentUnixMs === 'number' ? Math.max(0, Math.floor(obj.lastSentUnixMs)) : 0,
+    });
+    return usageStateCache;
+  } catch {
+    usageStateCache = defaultUsageState();
+    return usageStateCache;
+  }
+}
+
+async function saveUsageState(state: UsageBeaconState): Promise<void> {
+  usageStateCache = state;
+  if (!storage) {
+    return;
+  }
+  await storage.setItem(USAGE_STATE_STORAGE_KEY, JSON.stringify(state));
+}
+
+function defaultUsageState(): UsageBeaconState {
+  return {
+    usageDate: currentUsageDate(),
+    activeApps: 0,
+    crashReports: 0,
+    eventsEmitted: 0,
+    lastSentUnixMs: 0,
+  };
+}
+
+function normalizeUsageState(state: UsageBeaconState): UsageBeaconState {
+  const today = currentUsageDate();
+  if (state.usageDate === today) {
+    return state;
+  }
+  return defaultUsageState();
+}
+
+function currentUsageDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeUsageMode(mode: CircleBoxCloudUsageMode | undefined): CircleBoxCloudUsageMode {
+  switch (mode) {
+    case 'offline_only':
+    case 'core_cloud':
+    case 'core_adapters':
+    case 'core_cloud_adapters':
+    case 'self_host':
+      return mode;
+    default:
+      return 'core_cloud';
+  }
+}
+
+function bytesToString(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    out += String.fromCharCode(bytes[i]);
   }
   return out;
 }

@@ -1,3 +1,14 @@
+enum CircleBoxCloudUsageMode {
+  offlineOnly('offline_only'),
+  coreCloud('core_cloud'),
+  coreAdapters('core_adapters'),
+  coreCloudAdapters('core_cloud_adapters'),
+  selfHost('self_host');
+
+  const CircleBoxCloudUsageMode(this.wireValue);
+  final String wireValue;
+}
+
 class CircleBoxCloudConfig {
   const CircleBoxCloudConfig({
     required this.endpoint,
@@ -10,6 +21,11 @@ class CircleBoxCloudConfig {
     this.retryMaxBackoffSec = 900,
     this.enableAutoFlush = true,
     this.autoExportPendingOnStart = true,
+    this.enableUsageBeacon = false,
+    this.usageBeaconKey,
+    this.usageBeaconEndpoint,
+    this.usageBeaconMode = CircleBoxCloudUsageMode.coreCloud,
+    this.usageBeaconMinIntervalSec = 300,
   });
 
   final Uri endpoint;
@@ -22,4 +38,9 @@ class CircleBoxCloudConfig {
   final int retryMaxBackoffSec;
   final bool enableAutoFlush;
   final bool autoExportPendingOnStart;
+  final bool enableUsageBeacon;
+  final String? usageBeaconKey;
+  final Uri? usageBeaconEndpoint;
+  final CircleBoxCloudUsageMode usageBeaconMode;
+  final int usageBeaconMinIntervalSec;
 }

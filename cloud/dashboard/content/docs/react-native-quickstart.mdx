@@ -9,8 +9,8 @@ order: 5
 From release assets:
 
 ```bash
-npm install ./circlebox-react-native-0.3.0.tgz
-npm install ./circlebox-cloud-react-native-0.3.0.tgz
+npm install ./circlebox-react-native-0.3.1.tgz
+npm install ./circlebox-cloud-react-native-0.3.1.tgz
 ```
 
 For Expo prebuild apps, add plugin:
@@ -51,6 +51,6 @@ import * as CircleBoxCloud from "circlebox-cloud-react-native";
 
 await CircleBoxCloud.start({
   endpoint: "https://circlebox.seunjeremiah.workers.dev",
-  ingestKey: "cb_live_<project_uuid>_us_<secret>",
+  ingestKey: "paste_ingest_key_from_control_plane",
 });
 ```

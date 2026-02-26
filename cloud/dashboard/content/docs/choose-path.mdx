@@ -18,6 +18,7 @@ Use when you want managed ingestion, queue retry, and dashboard timelines.
 - Core packages above
 - `CircleBoxCloud` / `circlebox-cloud`
 - `circlebox_cloud_flutter` / `circlebox-cloud-react-native`
+- Ingest API key generated from `/signup` or `/app/projects/*/keys`
 
 ## Core + Sentry/PostHog
 
@@ -34,3 +35,11 @@ Use when you want both:
 - forwarding to existing observability stack
 
 This path is common during migration from single-vendor crash tooling.
+
+## Core + Self-Host (Optional Usage Beacon)
+
+Use when you want CircleBox crash payloads in your own backend/storage while still optionally sending aggregate usage counters.
+
+- Configure cloud uploader endpoint to your own ingest API
+- Keep `usage_beacon` key optional and opt-in only
+- No vendor lock-in on raw crash report ownership

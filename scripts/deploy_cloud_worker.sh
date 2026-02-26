@@ -80,8 +80,10 @@ required_vars=(
   CLOUDFLARE_API_TOKEN
   US_SUPABASE_URL
   EU_SUPABASE_URL
+  CONTROL_SUPABASE_URL
   US_SUPABASE_SERVICE_ROLE_KEY
   EU_SUPABASE_SERVICE_ROLE_KEY
+  CONTROL_SUPABASE_SERVICE_ROLE_KEY
 )
 
 for key in "${required_vars[@]}"; do
@@ -131,6 +133,7 @@ if [[ "$SKIP_SECRETS" -eq 0 ]]; then
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] wrangler secret put US_SUPABASE_SERVICE_ROLE_KEY"
     echo "[dry-run] wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY"
+    echo "[dry-run] wrangler secret put CONTROL_SUPABASE_SERVICE_ROLE_KEY"
     if [[ -n "${DASHBOARD_WORKER_TOKEN:-}" ]]; then
       echo "[dry-run] wrangler secret put DASHBOARD_WORKER_TOKEN"
     fi
@@ -140,6 +143,7 @@ if [[ "$SKIP_SECRETS" -eq 0 ]]; then
   else
     printf '%s' "$US_SUPABASE_SERVICE_ROLE_KEY" | wrangler secret put US_SUPABASE_SERVICE_ROLE_KEY >/dev/null
     printf '%s' "$EU_SUPABASE_SERVICE_ROLE_KEY" | wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY >/dev/null
+    printf '%s' "$CONTROL_SUPABASE_SERVICE_ROLE_KEY" | wrangler secret put CONTROL_SUPABASE_SERVICE_ROLE_KEY >/dev/null
     if [[ -n "${DASHBOARD_WORKER_TOKEN:-}" ]]; then
       printf '%s' "$DASHBOARD_WORKER_TOKEN" | wrangler secret put DASHBOARD_WORKER_TOKEN >/dev/null
     fi
@@ -153,6 +157,7 @@ log "Deploying worker"
 run_cmd wrangler deploy \
   --var "US_SUPABASE_URL=${US_SUPABASE_URL}" \
   --var "EU_SUPABASE_URL=${EU_SUPABASE_URL}" \
+  --var "CONTROL_SUPABASE_URL=${CONTROL_SUPABASE_URL}" \
   --var "CIRCLEBOX_R2_BUCKET_RAW_NAME=${R2_BUCKET_NAME}"
 
 if [[ -n "$WORKER_PUBLIC_URL" ]]; then

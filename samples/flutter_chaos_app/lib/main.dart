@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:circlebox_cloud_flutter/circlebox_cloud_flutter.dart';
 import 'package:circlebox_flutter/circlebox_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +18,41 @@ Future<void> main() async {
       captureCurrentIsolateErrors: true,
     ),
   );
+  await _startCloudIfConfigured();
   runApp(const ChaosApp());
+}
+
+Future<void> _startCloudIfConfigured() async {
+  const endpointRaw = String.fromEnvironment('CIRCLEBOX_WORKER_BASE_URL', defaultValue: '');
+  const ingestKeyRaw = String.fromEnvironment('CIRCLEBOX_INGEST_KEY', defaultValue: '');
+  const usageKeyRaw = String.fromEnvironment('CIRCLEBOX_USAGE_KEY', defaultValue: '');
+
+  final endpoint = endpointRaw.trim();
+  final ingestKey = ingestKeyRaw.trim();
+  final usageKey = usageKeyRaw.trim();
+  if (endpoint.isEmpty || ingestKey.isEmpty) {
+    return;
+  }
+
+  try {
+    await CircleBoxCloud.start(
+      CircleBoxCloudConfig(
+        endpoint: Uri.parse(endpoint),
+        ingestKey: ingestKey,
+        enableAutoFlush: true,
+        autoExportPendingOnStart: true,
+        enableUsageBeacon: usageKey.isNotEmpty,
+        usageBeaconKey: usageKey.isEmpty ? null : usageKey,
+        usageBeaconMode: CircleBoxCloudUsageMode.coreCloud,
+      ),
+    );
+    await CircleBox.breadcrumb('cloud_uploader_enabled', attrs: {'mode': 'core_cloud'});
+  } catch (error) {
+    await CircleBox.breadcrumb(
+      'cloud_uploader_start_failed',
+      attrs: {'error': error.toString()},
+    );
+  }
 }
 
 class ChaosApp extends StatelessWidget {

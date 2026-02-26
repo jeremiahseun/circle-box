@@ -36,6 +36,8 @@ export default function HomePage() {
             <div className="cta-row">
               <a href="/docs/getting-started" className="btn btn-primary">Get Started</a>
               <a href="/docs/release-matrix" className="btn">Install Matrix</a>
+              <a href="/signup" className="btn">Create Project + Keys</a>
+              <a href="/pricing" className="btn">Pricing</a>
               <a href="/dashboard/crashes" className="btn">Open Dashboard</a>
             </div>
             <div className="hero-kpis">

@@ -17,4 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "circlebox-android-chaos-app"
 include(":app")
 include(":circlebox-sdk")
+include(":circlebox-cloud")
 project(":circlebox-sdk").projectDir = file("../../android/circlebox-sdk")
+project(":circlebox-cloud").projectDir = file("../../android/circlebox-cloud")

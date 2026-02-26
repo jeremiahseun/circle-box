@@ -8,9 +8,20 @@ Companion uploader package for CircleBox Cloud.
 dependencies:
   circlebox_cloud_flutter:
     git:
-      url: https://github.com/jeremiahseun/circlebox.git
-      ref: v0.3.0
+      url: https://github.com/jeremiahseun/circle-box.git
+      ref: v0.3.1
       path: flutter/circlebox_cloud_flutter
+```
+
+`circlebox_cloud_flutter` depends on `circlebox_flutter` from the same tagged repository path:
+
+```yaml
+dependencies:
+  circlebox_flutter:
+    git:
+      url: https://github.com/jeremiahseun/circle-box.git
+      ref: v0.3.1
+      path: flutter/circlebox_flutter
 ```
 
 ## Usage
@@ -22,6 +33,9 @@ await CircleBoxCloud.start(
     ingestKey: 'cb_live_project_key',
     enableAutoFlush: true,
     autoExportPendingOnStart: true,
+    enableUsageBeacon: true,
+    usageBeaconKey: 'cb_usage_project_key',
+    usageBeaconMode: CircleBoxCloudUsageMode.coreCloud,
   ),
 );
 
@@ -39,3 +53,13 @@ Behavior:
 - Automatically checks pending crash reports on startup and app resume
 - Automatically drains queued uploads on `flushIntervalSec` while app is active
 - Automatic mode drains queue only; it does not create periodic live snapshots
+- Optional usage-beacon telemetry (`/v1/telemetry/usage`) is opt-in via `enableUsageBeacon` + `usageBeaconKey`
+- For self-host ingest, set `usageBeaconEndpoint` to CircleBox Worker to keep aggregate usage reporting enabled
+
+## Standalone Validation
+
+From this directory:
+
+```bash
+./scripts/package_check.sh
+```

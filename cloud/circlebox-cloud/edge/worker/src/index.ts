@@ -1,5 +1,6 @@
 type CircleBoxRegion = "us" | "eu";
 type CircleBoxIngestType = "report" | "fragment";
+type CircleBoxKeyType = "ingest" | "usage_beacon";
 type CircleBoxIdempotentResponse = Record<string, unknown>;
 type DashboardDownloadTokenPayload = {
   project_id: string;
@@ -35,6 +36,7 @@ type CircleBoxEnvelopeV2 = {
 type ProjectAuthContext = {
   projectId: string;
   region: CircleBoxRegion;
+  keyType: CircleBoxKeyType;
 };
 
 type RegionalSupabaseConfig = {
@@ -42,11 +44,44 @@ type RegionalSupabaseConfig = {
   serviceRoleKey: string;
 };
 
+type ControlPlaneSupabaseConfig = {
+  url: string;
+  serviceRoleKey: string;
+};
+
+type ApiKeyRecord = {
+  id: string;
+  project_id: string;
+  key_type: CircleBoxKeyType;
+  region_scope: "us" | "eu" | "auto";
+  hashed_secret: string;
+  expires_at: string | null;
+};
+
+type ParsedApiKey = {
+  rawKey: string;
+  prefix: string;
+  keyType: CircleBoxKeyType;
+  regionHint: CircleBoxRegion;
+};
+
+type UsageTelemetryPayload = {
+  sdk_family: string;
+  sdk_version: string;
+  mode: "offline_only" | "core_cloud" | "core_adapters" | "core_cloud_adapters" | "self_host";
+  usage_date?: string;
+  active_apps?: number;
+  crash_reports?: number;
+  events_emitted?: number;
+};
+
 export interface Env {
   US_SUPABASE_URL: string;
   EU_SUPABASE_URL: string;
   US_SUPABASE_SERVICE_ROLE_KEY: string;
   EU_SUPABASE_SERVICE_ROLE_KEY: string;
+  CONTROL_SUPABASE_URL?: string;
+  CONTROL_SUPABASE_SERVICE_ROLE_KEY?: string;
   DASHBOARD_WORKER_TOKEN?: string;
   DASHBOARD_SHARED_SECRET?: string;
   CIRCLEBOX_R2_BUCKET_RAW_NAME?: string;
@@ -57,8 +92,11 @@ const MAX_REPORT_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_FRAGMENT_BODY_BYTES = 256 * 1024;
 const ALLOWED_SEVERITIES = new Set(["info", "warn", "error", "fatal"]);
 const ALLOWED_THREADS = new Set(["main", "background", "crash"]);
+const ALLOWED_USAGE_MODES = new Set(["offline_only", "core_cloud", "core_adapters", "core_cloud_adapters", "self_host"]);
 const GZIP_MAGIC_0 = 0x1f;
 const GZIP_MAGIC_1 = 0x8b;
+const KEY_CACHE_TTL_MS = 60_000;
+const keyAuthCache = new Map<string, { context: ProjectAuthContext; expiresAtUnixMs: number }>();
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -72,18 +110,38 @@ export default {
       return json(405, { error: "method_not_allowed" });
     }
 
-    if (url.pathname !== "/v1/ingest/report" && url.pathname !== "/v1/ingest/fragment") {
+    if (
+      url.pathname !== "/v1/ingest/report" &&
+      url.pathname !== "/v1/ingest/fragment" &&
+      url.pathname !== "/v1/telemetry/usage"
+    ) {
       return json(404, { error: "not_found" });
     }
 
+    let auth: ProjectAuthContext;
+    if (url.pathname === "/v1/telemetry/usage") {
+      const usageKey = request.headers.get("x-circlebox-usage-key");
+      if (!usageKey) {
+        return json(401, { error: "invalid_usage_key" });
+      }
+      try {
+        auth = await authenticateApiKey(usageKey, env, "usage_beacon");
+      } catch (error) {
+        return json(401, {
+          error: "invalid_usage_key",
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+      return handleUsageTelemetry(request, env, auth);
+    }
+
     const ingestKey = request.headers.get("x-circlebox-ingest-key");
-    if (!ingestKey || !ingestKey.startsWith("cb_live_")) {
+    if (!ingestKey) {
       return json(401, { error: "invalid_ingest_key" });
     }
 
-    let auth: ProjectAuthContext;
     try {
-      auth = authenticateIngestKey(ingestKey);
+      auth = await authenticateApiKey(ingestKey, env, "ingest");
     } catch (error) {
       return json(401, {
         error: "invalid_ingest_key",
@@ -377,6 +435,83 @@ async function handleIngestFragment(request: Request, env: Env, auth: ProjectAut
   }
 }
 
+async function handleUsageTelemetry(
+  request: Request,
+  env: Env,
+  auth: ProjectAuthContext,
+): Promise<Response> {
+  const control = resolveControlPlaneSupabase(env);
+  if (!control) {
+    return json(503, {
+      error: "usage_telemetry_not_configured",
+      message: "missing_control_plane_config",
+    });
+  }
+
+  let payload: UsageTelemetryPayload;
+  try {
+    const raw = await request.json();
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new Error("invalid_payload");
+    }
+    payload = raw as UsageTelemetryPayload;
+    if (typeof payload.sdk_family !== "string" || payload.sdk_family.trim().length === 0) {
+      throw new Error("missing_sdk_family");
+    }
+    if (typeof payload.sdk_version !== "string" || payload.sdk_version.trim().length === 0) {
+      throw new Error("missing_sdk_version");
+    }
+    if (typeof payload.mode !== "string" || !ALLOWED_USAGE_MODES.has(payload.mode)) {
+      throw new Error("invalid_mode");
+    }
+  } catch (error) {
+    return json(400, {
+      error: "invalid_payload",
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
+
+  const usageDate = typeof payload.usage_date === "string" && payload.usage_date.length > 0
+    ? payload.usage_date
+    : dayFromUnixMs(Date.now());
+  const activeApps = clampNumber(payload.active_apps, 0, 1_000_000);
+  const crashReports = clampNumber(payload.crash_reports, 0, 10_000_000);
+  const eventsEmitted = clampNumber(payload.events_emitted, 0, 100_000_000);
+
+  try {
+    await restInsertControl(
+      control,
+      "usage_beacon_daily?on_conflict=project_id,usage_date,sdk_family,sdk_version,mode",
+      [
+        {
+          project_id: auth.projectId,
+          usage_date: usageDate,
+          sdk_family: payload.sdk_family.trim(),
+          sdk_version: payload.sdk_version.trim(),
+          mode: payload.mode,
+          active_apps: activeApps,
+          crash_reports: crashReports,
+          events_emitted: eventsEmitted,
+        },
+      ],
+      {
+        prefer: "resolution=merge-duplicates,return=minimal",
+      },
+    );
+  } catch (error) {
+    return json(503, {
+      error: "usage_telemetry_persistence_failed",
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
+
+  return json(202, {
+    status: "accepted",
+    project_id: auth.projectId,
+    usage_date: usageDate,
+  });
+}
+
 async function handleIssueDownloadToken(request: Request, env: Env, rawReportId: string): Promise<Response> {
   const dashboardToken = env.DASHBOARD_WORKER_TOKEN?.trim();
   const sharedSecret = env.DASHBOARD_SHARED_SECRET?.trim();
@@ -532,6 +667,19 @@ function resolveRegionalSupabase(env: Env, region: CircleBoxRegion): RegionalSup
   };
 }
 
+function resolveControlPlaneSupabase(env: Env): ControlPlaneSupabaseConfig | null {
+  const url = env.CONTROL_SUPABASE_URL?.trim();
+  const key = env.CONTROL_SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) {
+    return null;
+  }
+
+  return {
+    url: trimTrailingSlash(url),
+    serviceRoleKey: key,
+  };
+}
+
 async function readIdempotentResponse(
   regional: RegionalSupabaseConfig,
   projectId: string,
@@ -601,6 +749,80 @@ async function readReportStoragePath(
 
   const storagePath = rows[0]["storage_path"];
   return typeof storagePath === "string" && storagePath.length > 0 ? storagePath : null;
+}
+
+async function readApiKeyRecords(
+  control: ControlPlaneSupabaseConfig,
+  keyPrefix: string,
+  keyType: CircleBoxKeyType,
+): Promise<ApiKeyRecord[]> {
+  const query = new URLSearchParams({
+    key_prefix: `eq.${keyPrefix}`,
+    key_type: `eq.${keyType}`,
+    active: "is.true",
+    select: "id,project_id,key_type,region_scope,hashed_secret,expires_at",
+  });
+
+  const response = await fetch(`${control.url}/rest/v1/api_keys?${query.toString()}`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${control.serviceRoleKey}`,
+      apikey: control.serviceRoleKey,
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const body = await safeReadBody(response);
+    throw new Error(`rest_select_failed:api_keys:${response.status}:${body}`);
+  }
+
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  return rows
+    .map((row) => {
+      const id = asString(row["id"]);
+      const projectId = asString(row["project_id"]);
+      const rowKeyType = asString(row["key_type"]);
+      const regionScope = asString(row["region_scope"]);
+      const hashedSecret = asString(row["hashed_secret"]);
+      const expiresAt = asNullableString(row["expires_at"]);
+      if (!id || !projectId || !rowKeyType || !regionScope || !hashedSecret) {
+        return null;
+      }
+      if ((rowKeyType !== "ingest" && rowKeyType !== "usage_beacon")) {
+        return null;
+      }
+      if ((regionScope !== "us" && regionScope !== "eu" && regionScope !== "auto")) {
+        return null;
+      }
+
+      return {
+        id,
+        project_id: projectId,
+        key_type: rowKeyType,
+        region_scope: regionScope,
+        hashed_secret: hashedSecret,
+        expires_at: expiresAt,
+      } as ApiKeyRecord;
+    })
+    .filter((item): item is ApiKeyRecord => item !== null);
+}
+
+async function touchApiKey(control: ControlPlaneSupabaseConfig, keyId: string): Promise<void> {
+  const query = new URLSearchParams({
+    id: `eq.${keyId}`,
+  });
+  await fetch(`${control.url}/rest/v1/api_keys?${query.toString()}`, {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${control.serviceRoleKey}`,
+      apikey: control.serviceRoleKey,
+      "content-type": "application/json",
+      prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      last_used_at: new Date().toISOString(),
+    }),
+  });
 }
 
 async function persistIdempotentResponse(
@@ -676,6 +898,28 @@ async function restInsert(
   if (!response.ok) {
     const body = await safeReadBody(response);
     throw new Error(`rest_insert_failed:${resource}:${response.status}:${body}`);
+  }
+}
+
+async function restInsertControl(
+  control: ControlPlaneSupabaseConfig,
+  resource: string,
+  rows: Array<Record<string, unknown>>,
+  options: { prefer?: string } = {},
+): Promise<void> {
+  const response = await fetch(`${control.url}/rest/v1/${resource}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${control.serviceRoleKey}`,
+      apikey: control.serviceRoleKey,
+      "content-type": "application/json",
+      prefer: options.prefer ?? "return=minimal",
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!response.ok) {
+    const body = await safeReadBody(response);
+    throw new Error(`control_insert_failed:${resource}:${response.status}:${body}`);
   }
 }
 
@@ -808,7 +1052,62 @@ function makeFragment(envelope: CircleBoxEnvelopeV2, crashFingerprint: string | 
   };
 }
 
-function authenticateIngestKey(rawKey: string): ProjectAuthContext {
+async function authenticateApiKey(
+  rawKey: string,
+  env: Env,
+  expectedType: CircleBoxKeyType,
+): Promise<ProjectAuthContext> {
+  const parsed = parseApiKey(rawKey, expectedType);
+  const cacheHit = keyAuthCache.get(rawKey);
+  if (cacheHit && cacheHit.expiresAtUnixMs > Date.now() && cacheHit.context.keyType === expectedType) {
+    return cacheHit.context;
+  }
+
+  const control = resolveControlPlaneSupabase(env);
+  if (!control) {
+    if (expectedType !== "ingest") {
+      throw new Error("control_plane_required_for_usage_keys");
+    }
+    const fallback = authenticateLegacyIngestKey(rawKey);
+    keyAuthCache.set(rawKey, { context: fallback, expiresAtUnixMs: Date.now() + KEY_CACHE_TTL_MS });
+    return fallback;
+  }
+
+  const records = await readApiKeyRecords(control, parsed.prefix, expectedType);
+  if (records.length === 0) {
+    throw new Error("key_not_found_or_inactive");
+  }
+
+  const hashed = await sha256Hex(rawKey);
+  const matched = records.find((record) => secureEquals(record.hashed_secret, hashed));
+  if (!matched) {
+    throw new Error("key_secret_mismatch");
+  }
+
+  if (matched.expires_at && Date.now() > Date.parse(matched.expires_at)) {
+    throw new Error("key_expired");
+  }
+
+  const region = matched.region_scope === "auto"
+    ? parsed.regionHint
+    : matched.region_scope;
+
+  const context: ProjectAuthContext = {
+    projectId: normalizeProjectId(matched.project_id),
+    region,
+    keyType: expectedType,
+  };
+  keyAuthCache.set(rawKey, {
+    context,
+    expiresAtUnixMs: Date.now() + KEY_CACHE_TTL_MS,
+  });
+
+  void touchApiKey(control, matched.id);
+
+  return context;
+}
+
+function authenticateLegacyIngestKey(rawKey: string): ProjectAuthContext {
   if (!rawKey.startsWith("cb_live_")) {
     throw new Error("invalid_ingest_key_prefix");
   }
@@ -820,6 +1119,49 @@ function authenticateIngestKey(rawKey: string): ProjectAuthContext {
   return {
     projectId: normalizeProjectId(projectToken),
     region,
+    keyType: "ingest",
+  };
+}
+
+function parseApiKey(rawKey: string, expectedType: CircleBoxKeyType): ParsedApiKey {
+  const parts = rawKey.trim().split("_");
+  if (parts.length < 4 || parts[0] !== "cb") {
+    throw new Error("invalid_key_format");
+  }
+  const wireType = parts[1];
+  if (expectedType === "ingest" && wireType !== "live") {
+    throw new Error("invalid_ingest_key_prefix");
+  }
+  if (expectedType === "usage_beacon" && wireType !== "usage") {
+    throw new Error("invalid_usage_key_prefix");
+  }
+
+  if (expectedType === "ingest") {
+    if (parts.length < 5) {
+      throw new Error("invalid_ingest_key_format");
+    }
+    const projectToken = parts[2] || "project_demo";
+    const regionToken = parts[3] === "eu" ? "eu" : "us";
+    const keyLabel = parts.length >= 6 ? parts[4] : "";
+    const prefix = keyLabel.length > 0
+      ? `cb_live_${projectToken}_${regionToken}_${keyLabel}`
+      : `cb_live_${projectToken}_${regionToken}`;
+    return {
+      rawKey,
+      keyType: "ingest",
+      prefix,
+      regionHint: regionToken,
+    };
+  }
+
+  const projectToken = parts[2] || "project_demo";
+  const keyLabel = parts.length >= 5 ? parts[3] : "";
+  const prefix = keyLabel.length > 0 ? `cb_usage_${projectToken}_${keyLabel}` : `cb_usage_${projectToken}`;
+  return {
+    rawKey,
+    keyType: "usage_beacon",
+    prefix,
+    regionHint: "us",
   };
 }
 
@@ -994,8 +1336,23 @@ function secureEquals(a: string, b: string): boolean {
   return diff === 0;
 }
 
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function clamp(value: number, minValue: number, maxValue: number): number {
   return Math.max(minValue, Math.min(maxValue, value));
+}
+
+function clampNumber(value: unknown, minValue: number, maxValue: number): number {
+  if (typeof value !== "number" || Number.isNaN(value) || !Number.isFinite(value)) {
+    return minValue;
+  }
+  return clamp(Math.floor(value), minValue, maxValue);
 }
 
 function buildReportStoragePath(

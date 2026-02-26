@@ -75,14 +75,11 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Env file not found: $ENV_FILE" >&2
-  exit 1
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
 fi
-
-set -a
-source "$ENV_FILE"
-set +a
 
 if [[ -z "$BASE_URL" ]]; then
   BASE_URL="${WORKER_PUBLIC_BASE_URL:-}"

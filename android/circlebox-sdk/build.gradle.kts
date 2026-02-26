@@ -2,10 +2,11 @@ plugins {
     id("com.android.library")
     kotlin("android")
     kotlin("plugin.serialization")
+    id("maven-publish")
 }
 
 group = "com.circlebox.sdk"
-version = "0.3.0"
+version = "0.3.1"
 
 android {
     namespace = "com.circlebox.sdk"
@@ -38,6 +39,12 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 dependencies {
@@ -49,4 +56,23 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "com.circlebox.sdk"
+                artifactId = "circlebox-sdk"
+                version = project.version.toString()
+
+                pom {
+                    name.set("circlebox-sdk")
+                    description.set("Native CircleBox core SDK for Android")
+                    url.set("https://github.com/jeremiahseun/circlebox")
+                }
+            }
+        }
+    }
 }

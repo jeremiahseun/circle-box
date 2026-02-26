@@ -20,9 +20,11 @@ jobs:
       - name: Naming guard
         run: scripts/check_naming.sh
       - name: Release version map
-        run: scripts/check_release_versions.sh 0.3.0
+        run: scripts/check_release_versions.sh 0.3.1
       - name: Schema parity fixtures
         run: scripts/check_schema_parity.py
+      - name: CLI syntax check
+        run: bash -n scripts/cli/circlebox.sh
       - name: Dashboard docs/type checks
         working-directory: cloud/dashboard
         run: |
@@ -42,6 +44,14 @@ jobs:
             --base-url "${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}" \
             --ingest-key "${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
             --dashboard-token "${{ secrets.DASHBOARD_WORKER_TOKEN }}"
+      - name: Worker usage/key-auth smoke (optional when control-plane secrets are set)
+        if: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL != '' && secrets.CIRCLEBOX_SMOKE_INGEST_KEY != '' && secrets.CONTROL_SUPABASE_URL != '' && secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_usage_telemetry.sh \
+            --base-url "${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --control-url "${{ secrets.CONTROL_SUPABASE_URL }}" \
+            --control-service-role "${{ secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}"
 
   ios-assets:
     runs-on: macos-latest
@@ -87,7 +97,7 @@ jobs:
       - name: Build Android Cloud AAR
         working-directory: android/circlebox-cloud
         run: |
-          ../circlebox-sdk/gradlew --no-daemon -p . test assembleRelease
+          ./gradlew --no-daemon test assembleRelease
       - name: Collect Android artifacts
         run: |
           mkdir -p artifacts
@@ -119,7 +129,8 @@ jobs:
           flutter test
           cd ../circlebox_adapters
           flutter pub get
-          dart test
+          flutter analyze
+          flutter test
       - name: Package Flutter artifacts
         run: |
           mkdir -p artifacts

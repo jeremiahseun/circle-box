@@ -4,8 +4,20 @@
 
 ```bash
 cd samples/android-chaos-app
-gradle :app:installDebug
+./gradlew :app:installDebug
 ```
+
+## Optional Cloud Uploader (Real Dashboard Flow)
+
+Set project properties in `samples/android-chaos-app/gradle.properties`:
+
+```properties
+CIRCLEBOX_WORKER_BASE_URL=https://circlebox.seunjeremiah.workers.dev
+CIRCLEBOX_INGEST_KEY=cb_live_<project_key>
+CIRCLEBOX_USAGE_KEY=cb_usage_<project_key>
+```
+
+When endpoint + ingest key are set, the app starts `CircleBoxCloud` and auto-uploads pending crash exports.
 
 ## Flow
 

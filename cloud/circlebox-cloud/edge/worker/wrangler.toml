@@ -5,6 +5,7 @@ compatibility_date = "2026-02-20"
 [vars]
 US_SUPABASE_URL = "https://wkrlmudqrvimdzbqjnit.supabase.co"
 EU_SUPABASE_URL = "https://tselsyjxnxmgynqhurhn.supabase.co"
+CONTROL_SUPABASE_URL = "https://wkrlmudqrvimdzbqjnit.supabase.co"
 CIRCLEBOX_R2_BUCKET_RAW_NAME = "cb-reports-raw"
 
 [[r2_buckets]]

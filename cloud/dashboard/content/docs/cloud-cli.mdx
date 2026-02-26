@@ -1,0 +1,41 @@
+---
+title: Cloud CLI
+description: Manage projects and API keys from terminal using the control-plane script.
+order: 7
+---
+
+## Script Location
+
+- `scripts/cli/circlebox.sh`
+
+## Authenticate
+
+```bash
+scripts/cli/circlebox.sh auth login \
+  --control-url "https://<control-ref>.supabase.co" \
+  --service-role "<SERVICE_ROLE_KEY>"
+```
+
+## Create Project
+
+```bash
+scripts/cli/circlebox.sh project create \
+  --organization-id "<org_uuid>" \
+  --name "My Mobile App" \
+  --region us
+```
+
+## Create / Rotate / Revoke Keys
+
+```bash
+scripts/cli/circlebox.sh key create --project-id "<project_uuid>" --type ingest
+scripts/cli/circlebox.sh key rotate --project-id "<project_uuid>" --key-id "<api_key_uuid>"
+scripts/cli/circlebox.sh key revoke --project-id "<project_uuid>" --key-id "<api_key_uuid>"
+```
+
+## Behavior
+
+- Keys are only shown when created/rotated.
+- Control plane persists `hashed_secret` only.
+- Ingest keys map to worker auth via `x-circlebox-ingest-key`.
+- Usage beacon keys map to `x-circlebox-usage-key`.

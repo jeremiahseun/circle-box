@@ -5,6 +5,7 @@ Single Next.js app for:
 - Product landing page (`/`)
 - Developer docs (`/docs`)
 - Admin dashboard (`/dashboard/crashes`)
+- Control plane onboarding (`/signup`, `/login`, `/app/*`)
 
 The dashboard reads crash data from regional Supabase data planes and requests signed raw-download URLs from the worker.
 
@@ -20,6 +21,9 @@ Copy `.env.local.example` to `.env.local` and fill all values:
 - `DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_WORKER_BASE_URL`
 - `DASHBOARD_WORKER_TOKEN`
+- `DASHBOARD_CONTROL_SUPABASE_URL`
+- `DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY`
+- `DASHBOARD_APP_SESSION_SECRET`
 - Optional admin auth:
   - `DASHBOARD_ADMIN_USERNAME`
   - `DASHBOARD_ADMIN_PASSWORD`
@@ -58,5 +62,8 @@ Notes:
 - `/dashboard/crashes/[reportId]` shows report metadata plus ordered `report_event_index` timeline.
 - `project_id` and `region` can be overridden via query params for testing.
 - Raw report download uses a server-side route that requests a short-lived download token from the worker, then redirects to the signed download URL.
+- `/signup` creates account + org + first project + ingest/usage keys.
+- `/app/projects/[projectId]/keys` supports create/rotate/revoke and one-time key preview.
+- `/app/projects/[projectId]/usage` shows ingest usage and optional usage beacon aggregates.
 
 Legacy routes `/crashes` and `/crashes/[reportId]` redirect to `/dashboard/*`.
