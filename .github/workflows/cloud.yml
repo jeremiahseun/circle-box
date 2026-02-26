@@ -41,6 +41,18 @@ jobs:
 
       - name: Dashboard typecheck
         working-directory: cloud/dashboard
+        env:
+          DASHBOARD_DEFAULT_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+          DASHBOARD_DEFAULT_REGION: us
+          DASHBOARD_US_SUPABASE_URL: https://example-us.supabase.co
+          DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY: test-us-service-role
+          DASHBOARD_EU_SUPABASE_URL: https://example-eu.supabase.co
+          DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY: test-eu-service-role
+          DASHBOARD_WORKER_BASE_URL: https://example.workers.dev
+          DASHBOARD_WORKER_TOKEN: test-dashboard-worker-token
+          DASHBOARD_CONTROL_SUPABASE_URL: https://example-control.supabase.co
+          DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY: test-control-service-role
+          DASHBOARD_APP_SESSION_SECRET: test-dashboard-session-secret
         run: |
           npm install
           npm run typecheck

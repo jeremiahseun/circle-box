@@ -4,17 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if ! command -v rg >/dev/null 2>&1; then
-  echo "ripgrep (rg) is required" >&2
-  exit 2
-fi
-
 set +e
-MATCHES=$(rg -n -S "blackbox|BlackBox|BLACKBOX" \
-  --glob '!scripts/check_naming.sh' \
-  --glob '!docs/migration.md' \
-  --glob '!.git/*')
-STATUS=$?
+if command -v rg >/dev/null 2>&1; then
+  MATCHES=$(rg -n -S "blackbox|BlackBox|BLACKBOX" \
+    --glob '!scripts/check_naming.sh' \
+    --glob '!docs/migration.md' \
+    --glob '!.git/*')
+  STATUS=$?
+else
+  MATCHES=$(grep -RInE "blackbox|BlackBox|BLACKBOX" . \
+    --exclude-dir=.git \
+    --exclude='check_naming.sh' \
+    --exclude='migration.md')
+  STATUS=$?
+fi
 set -e
 
 if [[ $STATUS -eq 0 ]]; then
