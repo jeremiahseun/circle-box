@@ -10,13 +10,24 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-native/virtualized-lists": "^0.79.7",
     "circlebox-react-native": "file:../../react-native/circlebox-react-native",
     "expo": "^53.0.0",
-    "react": "18.3.1",
-    "react-native": "0.76.7"
+    "expo-asset": "~11.1.7",
+    "expo-constants": "~17.1.8",
+    "expo-file-system": "~18.1.11",
+    "expo-font": "~13.3.2",
+    "expo-keep-awake": "~14.1.4",
+    "expo-linking": "~7.1.7",
+    "expo-splash-screen": "~0.30.10",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.6",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1"
   },
   "devDependencies": {
-    "@types/react": "^18.2.66",
-    "typescript": "^5.6.3"
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
   }
 }

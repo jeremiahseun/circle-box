@@ -43,11 +43,15 @@ void main() {
       file.path,
       onSentryBreadcrumb: (breadcrumb) {
         sentryCount += 1;
-        expect(breadcrumb.category, 'breadcrumb');
+        expect(breadcrumb.category, 'circlebox.breadcrumb');
+        expect(breadcrumb.data['circlebox_source'], 'circlebox');
+        expect(breadcrumb.data['circlebox_mode'], 'export_adapter');
       },
       onPostHogCapture: (event) {
         postHogCount += 1;
         expect(event.event, 'circlebox_context');
+        expect(event.properties['circlebox_source'], 'circlebox');
+        expect(event.properties['circlebox_mode'], 'export_adapter');
       },
     );
 

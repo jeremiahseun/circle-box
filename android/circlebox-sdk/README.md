@@ -31,3 +31,11 @@ if (CircleBox.hasPendingCrashReport()) {
   println(files)
 }
 ```
+
+## Standalone Validation
+
+From this directory:
+
+```bash
+./scripts/package_check.sh
+```

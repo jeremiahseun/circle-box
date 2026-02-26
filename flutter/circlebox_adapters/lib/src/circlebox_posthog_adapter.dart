@@ -8,6 +8,8 @@ class CircleBoxPostHogAdapter {
   static CircleBoxPostHogEvent mapEnvelope(
     CircleBoxAdapterEnvelope envelope, {
     String eventName = 'circlebox_context',
+    String sdk = 'flutter',
+    String mode = 'export_adapter',
   }) {
     final typeCounts = <String, int>{};
     final severityCounts = <String, int>{};
@@ -30,6 +32,31 @@ class CircleBoxPostHogAdapter {
         'severity_counts': severityCounts,
         'last_event_type': lastEvent?.type,
         'last_event_severity': lastEvent?.severity,
+        'circlebox_source': 'circlebox',
+        'circlebox_mode': mode,
+        'circlebox_sdk': sdk,
+      },
+    );
+  }
+
+  static CircleBoxPostHogEvent mapEvent(
+    CircleBoxAdapterEvent event, {
+    String eventName = 'circlebox_realtime_event',
+    String sdk = 'flutter',
+  }) {
+    return CircleBoxPostHogEvent(
+      event: eventName,
+      properties: {
+        'seq': event.seq,
+        'timestamp_unix_ms': event.timestampUnixMs,
+        'uptime_ms': event.uptimeMs,
+        'type': event.type,
+        'thread': event.thread,
+        'severity': event.severity,
+        'attrs_json': event.attrs,
+        'circlebox_source': 'circlebox',
+        'circlebox_mode': 'realtime_adapter',
+        'circlebox_sdk': sdk,
       },
     );
   }
@@ -38,7 +65,15 @@ class CircleBoxPostHogAdapter {
     CircleBoxAdapterEnvelope envelope, {
     required CircleBoxPostHogCaptureSink onCapture,
     String eventName = 'circlebox_context',
+    String sdk = 'flutter',
   }) async {
-    await onCapture(mapEnvelope(envelope, eventName: eventName));
+    await onCapture(
+      mapEnvelope(
+        envelope,
+        eventName: eventName,
+        sdk: sdk,
+        mode: 'export_adapter',
+      ),
+    );
   }
 }

@@ -12,6 +12,12 @@ Use the root repository package:
 
 Then add product dependency: `CircleBoxCloud`.
 
+## Install (CocoaPods)
+
+```ruby
+pod 'CircleBoxCloud', '~> 0.3.1'
+```
+
 ## Usage
 
 ```swift
@@ -54,4 +60,11 @@ From this directory:
 
 ```bash
 ./scripts/package_check.sh
+```
+
+If you extract this package to its own repository (no sibling `../CircleBoxSDK` path),
+resolve dependencies with:
+
+```bash
+CIRCLEBOX_FORCE_REMOTE_SDK=1 swift package resolve
 ```

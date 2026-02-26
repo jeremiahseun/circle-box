@@ -368,6 +368,10 @@ python3 scripts/check_schema_parity.py
 bash scripts/release_check.sh
 ```
 
+Public registry publish runbook:
+
+- `docs/release/public-registries.md`
+
 Optional smoke flags for release check:
 
 - `CIRCLEBOX_WORKER_BASE_URL`

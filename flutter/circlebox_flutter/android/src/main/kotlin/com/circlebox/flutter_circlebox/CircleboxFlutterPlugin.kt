@@ -1,11 +1,13 @@
 package com.circlebox.flutter_circlebox
 
+import android.content.Context
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.io.File
+import java.lang.reflect.InvocationTargetException
 
 /**
  * Flutter bridge for the Android CircleBox SDK.
@@ -15,8 +17,10 @@ import java.io.File
  */
 class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private var context: Context? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        context = flutterPluginBinding.applicationContext
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "circlebox_flutter")
         channel.setMethodCallHandler(this)
     }
@@ -70,23 +74,41 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
             }
         } catch (error: ClassNotFoundException) {
             result.error("missing_native_sdk", "Native CircleBox Android SDK not found in host app", error.message)
+        } catch (error: InvocationTargetException) {
+            val realError = error.targetException ?: error.cause ?: error
+            result.error("circlebox_error", realError.message ?: realError.toString(), realError.stackTraceToString())
         } catch (error: Throwable) {
-            result.error("circlebox_error", error.message, null)
+            result.error("circlebox_error", error.message ?: error.toString(), error.stackTraceToString())
         }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        context = null
         channel.setMethodCallHandler(null)
     }
 
     private fun invokeNoArg(methodName: String): Any? {
         val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        ensureContextInstalled(clazz)
         val method = clazz.getMethod(methodName)
         return method.invoke(null)
     }
 
+    private fun ensureContextInstalled(clazz: Class<*>) {
+        val currentContext = context ?: return
+        runCatching {
+            // Check if context is already installed by calling a private field or similar,
+            // but easier to just call installContext (it is idempotent and fast)
+            val installMethod = clazz.getDeclaredMethod("installContext", Context::class.java)
+            installMethod.isAccessible = true
+            installMethod.invoke(null, currentContext)
+        }
+    }
+
     private fun invokeStart(config: Map<String, Any?>?) {
         val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        ensureContextInstalled(clazz)
+
         if (config == null) {
             invokeNoArg("start")
             return

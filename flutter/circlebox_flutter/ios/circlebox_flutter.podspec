@@ -1,11 +1,11 @@
 Pod::Spec.new do |s|
   s.name             = 'circlebox_flutter'
-  s.version          = '0.1.0'
+  s.version          = '0.3.1'
   s.summary          = 'Flutter bridge for CircleBox SDK'
   s.description      = <<-DESC
 Flutter bridge plugin for CircleBox native SDK.
                        DESC
-  s.homepage         = 'https://github.com/circlebox/circlebox'
+  s.homepage         = 'https://github.com/jeremiahseun/circle-box'
   s.license          = { :type => 'MIT', :file => '../LICENSE' }
   s.author           = { 'CircleBox' => 'oss@circlebox.dev' }
   s.source           = { :path => '.' }

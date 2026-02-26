@@ -8,8 +8,8 @@ Flutter bridge for CircleBox native SDKs.
 dependencies:
   circlebox_flutter:
     git:
-      url: https://github.com/jeremiahseun/circlebox.git
-      ref: v0.3.0
+      url: https://github.com/jeremiahseun/circle-box.git
+      ref: v0.3.1
       path: flutter/circlebox_flutter
 ```
 
@@ -61,3 +61,11 @@ This plugin calls native `CircleBox` implementations.
 
 - Cloud uploader: `circlebox_cloud_flutter`
 - Sentry/PostHog adapters: `circlebox_adapters`
+
+## Standalone Validation
+
+From this directory:
+
+```bash
+./scripts/package_check.sh
+```

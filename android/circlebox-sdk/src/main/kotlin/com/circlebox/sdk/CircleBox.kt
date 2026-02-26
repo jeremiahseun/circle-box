@@ -91,6 +91,22 @@ object CircleBox {
         return runtime().debugSnapshot(maxEvents)
     }
 
+    /**
+     * Registers a realtime event listener and returns a listener token.
+     */
+    @JvmStatic
+    fun addEventListener(listener: CircleBoxEventListener): String {
+        return runtime().addEventListener(listener)
+    }
+
+    /**
+     * Removes a realtime event listener by token.
+     */
+    @JvmStatic
+    fun removeEventListener(token: String) {
+        runtime().removeEventListener(token)
+    }
+
     private fun runtime(): CircleBoxRuntime {
         runtime?.let { return it }
 

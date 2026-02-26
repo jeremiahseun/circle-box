@@ -32,6 +32,12 @@ This verifies:
 - optional worker ingest smoke (`/v1/ingest/*`)
 - optional worker usage/key-auth smoke (`/v1/telemetry/usage`)
 
+Also run public-registry readiness checks:
+
+```bash
+scripts/release/public_registry_check.sh 0.3.1
+```
+
 ## 2) Create and push release tag
 
 ```bash

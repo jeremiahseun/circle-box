@@ -17,13 +17,15 @@ internal class CircleBoxRingBuffer<T>(capacity: Int) {
     private var storedCount = 0
     private var sequence: Long = 0
 
-    fun append(factory: (Long) -> T) {
-        runBlocking {
+    fun append(factory: (Long) -> T): T {
+        return runBlocking {
             mutex.withLock {
                 val next = sequence++
-                storage[writeIndex] = factory(next)
+                val element = factory(next)
+                storage[writeIndex] = element
                 writeIndex = (writeIndex + 1) % this@CircleBoxRingBuffer.capacity
                 storedCount = minOf(storedCount + 1, this@CircleBoxRingBuffer.capacity)
+                element
             }
         }
     }

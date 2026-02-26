@@ -16,9 +16,13 @@ check_contains() {
 check_contains "${ROOT_DIR}/flutter/circlebox_flutter/pubspec.yaml" "version: ${EXPECTED_VERSION}"
 check_contains "${ROOT_DIR}/flutter/circlebox_cloud_flutter/pubspec.yaml" "version: ${EXPECTED_VERSION}"
 check_contains "${ROOT_DIR}/flutter/circlebox_adapters/pubspec.yaml" "version: ${EXPECTED_VERSION}"
+check_contains "${ROOT_DIR}/flutter/circlebox_flutter/ios/circlebox_flutter.podspec" "s.version          = '${EXPECTED_VERSION}'"
+check_contains "${ROOT_DIR}/flutter/circlebox_flutter/android/build.gradle" "version '${EXPECTED_VERSION}'"
 
 check_contains "${ROOT_DIR}/react-native/circlebox-react-native/package.json" "\"version\": \"${EXPECTED_VERSION}\""
 check_contains "${ROOT_DIR}/react-native/circlebox-cloud-react-native/package.json" "\"version\": \"${EXPECTED_VERSION}\""
+check_contains "${ROOT_DIR}/CircleBoxSDK.podspec" "s.version          = '${EXPECTED_VERSION}'"
+check_contains "${ROOT_DIR}/CircleBoxCloud.podspec" "s.version          = '${EXPECTED_VERSION}'"
 
 check_contains "${ROOT_DIR}/android/circlebox-sdk/build.gradle.kts" "version = \"${EXPECTED_VERSION}\""
 check_contains "${ROOT_DIR}/android/circlebox-cloud/build.gradle.kts" "version = \"${EXPECTED_VERSION}\""

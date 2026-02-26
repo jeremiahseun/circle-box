@@ -2,8 +2,13 @@
 import PackageDescription
 import Foundation
 
-private let localSDKPath = "../CircleBoxSDK"
-private let useLocalSDK = FileManager.default.fileExists(atPath: localSDKPath)
+private let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+private let localSDKPath = packageDirectory
+    .appendingPathComponent("../CircleBoxSDK")
+    .standardizedFileURL
+    .path
+private let forceRemoteSDK = ProcessInfo.processInfo.environment["CIRCLEBOX_FORCE_REMOTE_SDK"] == "1"
+private let useLocalSDK = !forceRemoteSDK && FileManager.default.fileExists(atPath: localSDKPath)
 private let sdkPackageDependency: Package.Dependency = useLocalSDK
     ? .package(path: localSDKPath)
     : .package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")

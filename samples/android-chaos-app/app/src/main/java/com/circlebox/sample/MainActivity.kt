@@ -49,6 +49,15 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Exported ${files.size} file(s)", Toast.LENGTH_SHORT).show()
         }
 
+        findViewById<Button>(R.id.btnCloudFlush).setOnClickListener {
+            try {
+                val files = CircleBoxCloud.flush()
+                Toast.makeText(this, "Uploaded ${files.size} file(s) to cloud", Toast.LENGTH_SHORT).show()
+            } catch (error: IllegalStateException) {
+                Toast.makeText(this, "Cloud flush failed: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         findViewById<Button>(R.id.btnViewer).setOnClickListener {
             openViewerDialog()
         }

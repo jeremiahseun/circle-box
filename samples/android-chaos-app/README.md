@@ -18,6 +18,7 @@ CIRCLEBOX_USAGE_KEY=cb_usage_<project_key>
 ```
 
 When endpoint + ingest key are set, the app starts `CircleBoxCloud` and auto-uploads pending crash exports.
+The usage key is optional and only required for aggregate usage telemetry.
 
 ## Flow
 
@@ -25,5 +26,6 @@ When endpoint + ingest key are set, the app starts `CircleBoxCloud` and auto-upl
 2. Tap **Hard Crash**.
 3. Re-open app.
 4. Export logs and inspect JSON/CSV ordering.
-5. Tap **Open Local Viewer** to inspect in-memory timeline events.
-6. Use type/severity/thread filters before viewing results.
+5. Tap **Upload to Cloud Now** to send current logs immediately.
+6. Tap **Open Local Viewer** to inspect in-memory timeline events.
+7. Use type/severity/thread filters before viewing results.

@@ -45,4 +45,17 @@ public enum CircleBox {
     public static func debugSnapshot(maxEvents: Int = 200) -> [CircleBoxEvent] {
         runtime.debugSnapshot(maxEvents: maxEvents)
     }
+
+    /// Registers a non-blocking observer for realtime CircleBox events.
+    ///
+    /// Returns a token that can be passed to `removeEventObserver`.
+    @discardableResult
+    public static func addEventObserver(_ observer: @escaping (CircleBoxEvent) -> Void) -> UUID {
+        runtime.addEventObserver(observer)
+    }
+
+    /// Removes a previously registered realtime event observer.
+    public static func removeEventObserver(_ token: UUID) {
+        runtime.removeEventObserver(token)
+    }
 }

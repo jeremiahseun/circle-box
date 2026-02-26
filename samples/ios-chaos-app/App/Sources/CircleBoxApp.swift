@@ -1,11 +1,13 @@
 import SwiftUI
 import CircleBoxSDK
+#if canImport(CircleBoxCloud)
 import CircleBoxCloud
+#endif
 
 @main
 struct CircleBoxApp: App {
     init() {
-        CircleBox.start(config: CircleBoxConfig(enableDebugViewer: true))
+        CircleBox.start(config: CircleBoxConfig(bufferCapacity: 300, enableSignalCrashCapture: true))
         startCloudIfConfigured()
     }
 
@@ -15,6 +17,7 @@ struct CircleBoxApp: App {
         }
     }
 
+#if canImport(CircleBoxCloud)
     private func startCloudIfConfigured() {
         let env = ProcessInfo.processInfo.environment
         guard
@@ -41,4 +44,9 @@ struct CircleBoxApp: App {
         )
         CircleBox.breadcrumb("cloud_uploader_enabled", attrs: ["mode": "core_cloud"])
     }
+#else
+    private func startCloudIfConfigured() {
+        // CircleBoxCloud not available; skip cloud startup.
+    }
+#endif
 }

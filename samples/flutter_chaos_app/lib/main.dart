@@ -55,6 +55,12 @@ Future<void> _startCloudIfConfigured() async {
   }
 }
 
+bool _isCloudConfigured() {
+  const endpointRaw = String.fromEnvironment('CIRCLEBOX_WORKER_BASE_URL', defaultValue: '');
+  const ingestKeyRaw = String.fromEnvironment('CIRCLEBOX_INGEST_KEY', defaultValue: '');
+  return endpointRaw.trim().isNotEmpty && ingestKeyRaw.trim().isNotEmpty;
+}
+
 class ChaosApp extends StatelessWidget {
   const ChaosApp({super.key});
 
@@ -151,6 +157,25 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
       }
       setState(() {
         _statusMessage = 'Export failed: $error';
+      });
+    }
+  }
+
+  Future<void> _flushCloud() async {
+    try {
+      final files = await CircleBoxCloud.flush();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = 'Uploaded ${files.length} file(s) to cloud';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = 'Cloud upload failed: $error';
       });
     }
   }
@@ -341,6 +366,8 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
               ),
               const SizedBox(height: 12),
               _ActionButton(title: 'Export Logs', onPressed: _exportLogs),
+              if (_isCloudConfigured())
+                _ActionButton(title: 'Upload to Cloud Now', onPressed: _flushCloud),
             ],
           ),
           const SizedBox(height: 16),
