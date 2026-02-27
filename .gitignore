@@ -34,3 +34,4 @@ artifacts/
 
 # Wrangler
 .wrangler/
+.vercel

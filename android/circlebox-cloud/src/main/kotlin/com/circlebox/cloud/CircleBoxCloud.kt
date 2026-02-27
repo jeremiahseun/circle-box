@@ -7,6 +7,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Proxy
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -42,6 +44,9 @@ object CircleBoxCloud {
     private var usageBeaconState: UsageBeaconState? = null
     private var lifecycleObserver: DefaultLifecycleObserver? = null
     private var appInForeground = true
+    private var highSignalListenerToken: String? = null
+    private var highSignalListenerProxy: Any? = null
+    private var lastImmediateFlushUnixMs: Long = 0
     @Volatile
     private var isSendingUsageBeacon = false
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -95,6 +100,7 @@ object CircleBoxCloud {
             saveUsageStateLocked()
             appInForeground = true
             registerLifecycleObserverLocked()
+            registerHighSignalListenerLocked(config)
             configurePeriodicFlushLocked(config)
         }
 
@@ -201,6 +207,94 @@ object CircleBoxCloud {
             // Ignore lifecycle observer failures and continue best-effort.
             lifecycleObserver = null
         }
+    }
+
+    private fun registerHighSignalListenerLocked(localConfig: CircleBoxCloudConfig) {
+        if (!localConfig.immediateFlushOnHighSignal) {
+            unregisterHighSignalListenerLocked()
+            return
+        }
+        if (highSignalListenerToken != null) {
+            return
+        }
+
+        runCatching {
+            val circleBoxClass = Class.forName("com.circlebox.sdk.CircleBox")
+            val listenerInterface = Class.forName("com.circlebox.sdk.CircleBoxEventListener")
+            val proxy = Proxy.newProxyInstance(
+                listenerInterface.classLoader,
+                arrayOf(listenerInterface),
+                InvocationHandler { _, method, args ->
+                    if (method.name == "onEvent" && args != null && args.isNotEmpty()) {
+                        requestImmediateFlushForHighSignalEvent(args[0])
+                    }
+                    null
+                },
+            )
+            val token = circleBoxClass.getMethod("addEventListener", listenerInterface)
+                .invoke(null, proxy) as? String
+            if (!token.isNullOrBlank()) {
+                highSignalListenerToken = token
+                highSignalListenerProxy = proxy
+            }
+        }.onFailure {
+            highSignalListenerToken = null
+            highSignalListenerProxy = null
+        }
+    }
+
+    private fun unregisterHighSignalListenerLocked() {
+        val token = highSignalListenerToken ?: return
+        runCatching {
+            val circleBoxClass = Class.forName("com.circlebox.sdk.CircleBox")
+            circleBoxClass.getMethod("removeEventListener", String::class.java).invoke(null, token)
+        }
+        highSignalListenerToken = null
+        highSignalListenerProxy = null
+    }
+
+    private fun requestImmediateFlushForHighSignalEvent(event: Any) {
+        val localConfig = config ?: return
+        if (!localConfig.immediateFlushOnHighSignal || paused.get()) {
+            return
+        }
+        if (!isHighSignalEvent(event)) {
+            return
+        }
+
+        val shouldTrigger = synchronized(lock) {
+            val now = nowMs()
+            if ((now - lastImmediateFlushUnixMs) < 2_000) {
+                false
+            } else {
+                lastImmediateFlushUnixMs = now
+                true
+            }
+        }
+        if (!shouldTrigger) {
+            return
+        }
+
+        scheduler.execute {
+            runCatching { flush() }
+            sendUsageBeaconIfNeeded(localConfig, force = false)
+        }
+    }
+
+    private fun isHighSignalEvent(event: Any): Boolean {
+        val type = readEventField(event, "getType")
+        if (type == "native_exception_prehook") {
+            return true
+        }
+        val severity = readEventField(event, "getSeverity")
+        return severity == "error" || severity == "fatal"
+    }
+
+    private fun readEventField(event: Any, getterName: String): String {
+        return runCatching {
+            val raw = event.javaClass.getMethod(getterName).invoke(event)
+            raw?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+        }.getOrDefault("")
     }
 
     private fun configurePeriodicFlushLocked(localConfig: CircleBoxCloudConfig) {

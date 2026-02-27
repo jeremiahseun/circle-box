@@ -1,6 +1,8 @@
 import type { DashboardSearchParams } from "../../../lib/env";
 import CrashesPage from "../../../components/dashboard/crashes-page";
 
+export const dynamic = "force-dynamic";
+
 type PageProps = {
   searchParams?: DashboardSearchParams;
 };

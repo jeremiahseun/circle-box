@@ -14,7 +14,7 @@ export default function LoginPage({ searchParams = {} }: LoginPageProps) {
           <span className="badge">CircleBox Cloud</span>
           <h1 style={{ marginBottom: 8 }}>Sign In</h1>
           <p style={{ color: "var(--ink-soft)", marginBottom: 0 }}>
-            No account yet? <a href="/signup">Create one</a>.
+            No account yet? <a href="/signup">Create one</a>. Have an invite token? Add it during signup or on onboarding after sign in.
           </p>
         </div>
       </Card>

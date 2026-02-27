@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Card } from "../../../../../components/ui/card";
-import { getProjectForUser, listApiKeysForProject } from "../../../../../lib/control-plane";
+import { getProjectForUser, getProjectRoleForUser, listApiKeysForProject } from "../../../../../lib/control-plane";
 import { readKeyPreview } from "../../../../../lib/key-preview";
 import { requireSession } from "../../../../../lib/session";
 
@@ -22,10 +22,12 @@ export default async function ProjectKeysPage({
     notFound();
   }
 
-  const [keys, preview] = await Promise.all([
+  const [keys, preview, role] = await Promise.all([
     listApiKeysForProject({ userId: session.userId, projectId: project.id }),
     Promise.resolve(readKeyPreview(project.id)),
+    getProjectRoleForUser({ userId: session.userId, projectId: project.id }),
   ]);
+  const isOwner = role === "owner";
 
   const error = firstValue(searchParams.error);
   const success = firstValue(searchParams.success);
@@ -39,7 +41,10 @@ export default async function ProjectKeysPage({
             Project ID: <code>{project.id}</code> | Region: <code>{project.region}</code>
           </p>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
-            <a href={`/app/projects/${project.id}/usage`}>View usage</a>
+            <a href={`/app/projects/${project.id}/crashes`}>Crashes</a> |{" "}
+            <a href={`/app/projects/${project.id}/usage`}>Usage</a> |{" "}
+            <a href={`/app/projects/${project.id}/members`}>Members</a> |{" "}
+            <a href={`/app/projects/${project.id}/invites`}>Invites</a>
           </p>
         </div>
       </Card>
@@ -86,15 +91,16 @@ export default async function ProjectKeysPage({
       <Card>
         <div style={{ padding: 16 }}>
           <h3 style={{ marginTop: 0 }}>Create Key</h3>
+          {!isOwner && <p style={{ color: "var(--ink-soft)" }}>Only owners can create, rotate, or revoke keys.</p>}
           <form action={`/api/projects/${project.id}/keys/create`} method="POST" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <label>
               Key Type{" "}
-              <select name="key_type" defaultValue="ingest">
+              <select name="key_type" defaultValue="ingest" disabled={!isOwner}>
                 <option value="ingest">ingest</option>
                 <option value="usage_beacon">usage_beacon</option>
               </select>
             </label>
-            <button className="btn btn-primary" type="submit">Generate Key</button>
+            <button className="btn btn-primary" type="submit" disabled={!isOwner}>Generate Key</button>
           </form>
         </div>
       </Card>
@@ -111,6 +117,7 @@ export default async function ProjectKeysPage({
                     <th>Prefix</th>
                     <th>Type</th>
                     <th>Scope</th>
+                    <th>Rate Limit</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Last Used</th>
@@ -123,16 +130,19 @@ export default async function ProjectKeysPage({
                       <td><code>{key.key_prefix}</code></td>
                       <td>{key.key_type}</td>
                       <td>{key.region_scope}</td>
+                      <td>
+                        {key.max_reports_per_minute} rpt/min, {key.max_fragments_per_minute} frag/min, burst {key.burst_limit}
+                      </td>
                       <td>{key.active ? "active" : "revoked"}</td>
                       <td>{new Date(key.created_at).toLocaleString()}</td>
                       <td>{key.last_used_at ? new Date(key.last_used_at).toLocaleString() : "-"}</td>
                       <td>
                         <div style={{ display: "flex", gap: 8 }}>
                           <form action={`/api/projects/${project.id}/keys/${key.id}/rotate`} method="POST">
-                            <button className="btn" type="submit" disabled={!key.active}>Rotate</button>
+                            <button className="btn" type="submit" disabled={!key.active || !isOwner}>Rotate</button>
                           </form>
                           <form action={`/api/projects/${project.id}/keys/${key.id}/revoke`} method="POST">
-                            <button className="btn" type="submit" disabled={!key.active}>Revoke</button>
+                            <button className="btn" type="submit" disabled={!key.active || !isOwner}>Revoke</button>
                           </form>
                         </div>
                       </td>

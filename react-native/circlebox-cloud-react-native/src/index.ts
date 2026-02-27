@@ -21,6 +21,7 @@ export type CircleBoxCloudConfig = {
   retryMaxBackoffSec?: number;
   enableAutoFlush?: boolean;
   autoExportPendingOnStart?: boolean;
+  immediateFlushOnHighSignal?: boolean;
   enableUsageBeacon?: boolean;
   usageBeaconKey?: string;
   usageBeaconEndpoint?: string;
@@ -71,22 +72,48 @@ let isSendingUsageBeacon = false;
 let appState: AppStateStatus = AppState.currentState ?? 'active';
 let appStateSubscription: { remove: () => void } | null = null;
 let flushIntervalHandle: ReturnType<typeof setInterval> | null = null;
+let highSignalSubscription: { remove: () => void } | null = null;
+let lastImmediateFlushUnixMs = 0;
 const storage = resolveOptionalStorage();
 
 export async function start(nextConfig: CircleBoxCloudConfig): Promise<void> {
+  const sanitizedIngestKey = nextConfig.ingestKey.trim();
+  if (!sanitizedIngestKey.startsWith('cb_live_')) {
+    throw new Error('ingestKey must use cb_live_ prefix');
+  }
+  const sanitizedUsageKey = nextConfig.usageBeaconKey?.trim();
+  if (sanitizedUsageKey && !sanitizedUsageKey.startsWith('cb_usage_')) {
+    throw new Error('usageBeaconKey must use cb_usage_ prefix');
+  }
+
+  const flushIntervalSec = Math.max(10, nextConfig.flushIntervalSec ?? 15);
+  const maxQueueMb = Math.max(1, nextConfig.maxQueueMb ?? 20);
+  const retryMaxBackoffSec = Math.max(30, nextConfig.retryMaxBackoffSec ?? 900);
+  const usageBeaconMinIntervalSec = Math.max(30, nextConfig.usageBeaconMinIntervalSec ?? 300);
+  const normalizedNextConfig: CircleBoxCloudConfig = {
+    ...nextConfig,
+    ingestKey: sanitizedIngestKey,
+    usageBeaconKey: sanitizedUsageKey,
+    flushIntervalSec,
+    maxQueueMb,
+    retryMaxBackoffSec,
+    usageBeaconMinIntervalSec,
+  };
+
   config = {
     region: 'auto',
     enableFragmentSync: true,
-    flushIntervalSec: 60,
+    flushIntervalSec: 15,
     maxQueueMb: 20,
     wifiOnly: false,
     retryMaxBackoffSec: 900,
     enableAutoFlush: true,
     autoExportPendingOnStart: true,
+    immediateFlushOnHighSignal: true,
     enableUsageBeacon: false,
     usageBeaconMode: 'core_cloud',
     usageBeaconMinIntervalSec: 300,
-    ...nextConfig,
+    ...normalizedNextConfig,
   };
   paused = false;
   await loadQueue();
@@ -95,6 +122,7 @@ export async function start(nextConfig: CircleBoxCloudConfig): Promise<void> {
   await saveUsageState(usageStateCache ?? defaultUsageState());
   ensureAppStateListener();
   configureAutoFlushTimer();
+  configureHighSignalListener();
   await runForegroundDrain(Boolean(config.autoExportPendingOnStart));
 }
 
@@ -199,6 +227,53 @@ function configureAutoFlushTimer(): void {
     }
     void processQueue(current);
   }, intervalMs);
+}
+
+function configureHighSignalListener(): void {
+  const localConfig = config;
+  if (!localConfig || !localConfig.immediateFlushOnHighSignal) {
+    highSignalSubscription?.remove();
+    highSignalSubscription = null;
+    return;
+  }
+  if (highSignalSubscription) {
+    return;
+  }
+
+  highSignalSubscription = CircleBox.addEventListener((event) => {
+    if (!isHighSignalEvent(event)) {
+      return;
+    }
+    if (paused || !config?.immediateFlushOnHighSignal) {
+      return;
+    }
+    const now = nowMs();
+    if ((now - lastImmediateFlushUnixMs) < 2_000) {
+      return;
+    }
+    lastImmediateFlushUnixMs = now;
+    void flushForHighSignal();
+  }, {
+    forwardAll: true,
+    pollIntervalMs: 400,
+    maxEvents: 200,
+  });
+}
+
+async function flushForHighSignal(): Promise<void> {
+  try {
+    await flush();
+  } catch {
+    // Keep high-signal immediate flush best-effort and non-throwing.
+  }
+  await sendUsageBeaconIfNeeded(false);
+}
+
+function isHighSignalEvent(event: { type: string; severity: string }): boolean {
+  if (event.type === 'native_exception_prehook') {
+    return true;
+  }
+  return event.severity === 'error' || event.severity === 'fatal';
 }
 
 function stopAutoFlushTimer(): void {

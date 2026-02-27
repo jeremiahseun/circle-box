@@ -8,6 +8,9 @@ EU_SUPABASE_URL = "https://tselsyjxnxmgynqhurhn.supabase.co"
 CONTROL_SUPABASE_URL = "https://wkrlmudqrvimdzbqjnit.supabase.co"
 CIRCLEBOX_R2_BUCKET_RAW_NAME = "cb-reports-raw"
 
+[triggers]
+crons = ["0 * * * *"]
+
 [[r2_buckets]]
 binding = "CB_REPORTS_RAW"
 bucket_name = "cb-reports-raw"

@@ -25,6 +25,7 @@ public struct CircleBoxCloudConfig: Sendable {
     public let retryMaxBackoffSec: TimeInterval
     public let enableAutoFlush: Bool
     public let autoExportPendingOnStart: Bool
+    public let immediateFlushOnHighSignal: Bool
     public let enableUsageBeacon: Bool
     public let usageBeaconKey: String?
     public let usageBeaconEndpoint: URL?
@@ -36,20 +37,32 @@ public struct CircleBoxCloudConfig: Sendable {
         ingestKey: String,
         region: String = "auto",
         enableFragmentSync: Bool = true,
-        flushIntervalSec: TimeInterval = 60,
+        flushIntervalSec: TimeInterval = 15,
         maxQueueMB: Int = 20,
         wifiOnly: Bool = false,
         retryMaxBackoffSec: TimeInterval = 900,
         enableAutoFlush: Bool = true,
         autoExportPendingOnStart: Bool = true,
+        immediateFlushOnHighSignal: Bool = true,
         enableUsageBeacon: Bool = false,
         usageBeaconKey: String? = nil,
         usageBeaconEndpoint: URL? = nil,
         usageBeaconMode: CircleBoxCloudUsageMode = .coreCloud,
         usageBeaconMinIntervalSec: TimeInterval = 300
     ) {
+        let trimmedIngestKey = ingestKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        precondition(trimmedIngestKey.hasPrefix("cb_live_"), "ingestKey must use cb_live_ prefix")
+        let trimmedUsageKey = usageBeaconKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedUsageKey, !trimmedUsageKey.isEmpty {
+            precondition(trimmedUsageKey.hasPrefix("cb_usage_"), "usageBeaconKey must use cb_usage_ prefix")
+        }
+        if let usageBeaconEndpoint {
+            let lower = usageBeaconEndpoint.absoluteString.lowercased()
+            precondition(lower.hasPrefix("http://") || lower.hasPrefix("https://"), "usageBeaconEndpoint must be http(s)")
+        }
+
         self.endpoint = endpoint
-        self.ingestKey = ingestKey
+        self.ingestKey = trimmedIngestKey
         self.region = region
         self.enableFragmentSync = enableFragmentSync
         self.flushIntervalSec = max(10, flushIntervalSec)
@@ -58,8 +71,9 @@ public struct CircleBoxCloudConfig: Sendable {
         self.retryMaxBackoffSec = max(30, retryMaxBackoffSec)
         self.enableAutoFlush = enableAutoFlush
         self.autoExportPendingOnStart = autoExportPendingOnStart
+        self.immediateFlushOnHighSignal = immediateFlushOnHighSignal
         self.enableUsageBeacon = enableUsageBeacon
-        self.usageBeaconKey = usageBeaconKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.usageBeaconKey = trimmedUsageKey
         self.usageBeaconEndpoint = usageBeaconEndpoint
         self.usageBeaconMode = usageBeaconMode
         self.usageBeaconMinIntervalSec = max(30, usageBeaconMinIntervalSec)
@@ -117,6 +131,8 @@ public enum CircleBoxCloud {
     private static var usageBeaconState: CircleBoxCloudUsageBeaconState?
     private static var isSendingUsageBeacon = false
     private static var autoFlushTimer: DispatchSourceTimer?
+    private static var highSignalObserverToken: UUID?
+    private static var lastImmediateFlushUnixMs: Int64 = 0
     private static var isAppActive = true
 
     #if canImport(UIKit)
@@ -134,6 +150,7 @@ public enum CircleBoxCloud {
             try? persistUsageBeaconStateLocked()
             updateForegroundStateLocked()
             configureAutoFlushLocked()
+            configureHighSignalFlushObserverLocked()
         }
 
         Task {
@@ -303,6 +320,55 @@ public enum CircleBoxCloud {
         }
         timer.resume()
         autoFlushTimer = timer
+    }
+
+    private static func configureHighSignalFlushObserverLocked() {
+        guard let localConfig = config else {
+            removeHighSignalObserverLocked()
+            return
+        }
+        guard localConfig.immediateFlushOnHighSignal else {
+            removeHighSignalObserverLocked()
+            return
+        }
+        guard highSignalObserverToken == nil else { return }
+
+        highSignalObserverToken = CircleBox.addEventObserver { event in
+            stateQueue.async {
+                requestImmediateFlushIfNeededLocked(for: event)
+            }
+        }
+    }
+
+    private static func removeHighSignalObserverLocked() {
+        guard let token = highSignalObserverToken else { return }
+        CircleBox.removeEventObserver(token)
+        highSignalObserverToken = nil
+    }
+
+    private static func requestImmediateFlushIfNeededLocked(for event: CircleBoxEvent) {
+        guard let localConfig = config else { return }
+        guard localConfig.immediateFlushOnHighSignal else { return }
+        guard !paused else { return }
+        guard isHighSignalEvent(event) else { return }
+
+        let now = nowMs()
+        if now - lastImmediateFlushUnixMs < 2_000 {
+            return
+        }
+        lastImmediateFlushUnixMs = now
+
+        Task {
+            _ = try? await flush()
+            await sendUsageBeaconIfNeeded(force: false)
+        }
+    }
+
+    private static func isHighSignalEvent(_ event: CircleBoxEvent) -> Bool {
+        if event.type == "native_exception_prehook" {
+            return true
+        }
+        return event.severity == .error || event.severity == .fatal
     }
 
     private static func stopAutoFlushTimerLocked() {

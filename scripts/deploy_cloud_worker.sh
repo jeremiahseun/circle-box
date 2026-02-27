@@ -140,6 +140,9 @@ if [[ "$SKIP_SECRETS" -eq 0 ]]; then
     if [[ -n "${DASHBOARD_SHARED_SECRET:-}" ]]; then
       echo "[dry-run] wrangler secret put DASHBOARD_SHARED_SECRET"
     fi
+    if [[ -n "${SYNTHETIC_ALERT_WEBHOOK_URL:-}" ]]; then
+      echo "[dry-run] wrangler secret put SYNTHETIC_ALERT_WEBHOOK_URL"
+    fi
   else
     printf '%s' "$US_SUPABASE_SERVICE_ROLE_KEY" | wrangler secret put US_SUPABASE_SERVICE_ROLE_KEY >/dev/null
     printf '%s' "$EU_SUPABASE_SERVICE_ROLE_KEY" | wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY >/dev/null
@@ -150,15 +153,24 @@ if [[ "$SKIP_SECRETS" -eq 0 ]]; then
     if [[ -n "${DASHBOARD_SHARED_SECRET:-}" ]]; then
       printf '%s' "$DASHBOARD_SHARED_SECRET" | wrangler secret put DASHBOARD_SHARED_SECRET >/dev/null
     fi
+    if [[ -n "${SYNTHETIC_ALERT_WEBHOOK_URL:-}" ]]; then
+      printf '%s' "$SYNTHETIC_ALERT_WEBHOOK_URL" | wrangler secret put SYNTHETIC_ALERT_WEBHOOK_URL >/dev/null
+    fi
   fi
 fi
 
 log "Deploying worker"
-run_cmd wrangler deploy \
+deploy_cmd=(wrangler deploy \
   --var "US_SUPABASE_URL=${US_SUPABASE_URL}" \
   --var "EU_SUPABASE_URL=${EU_SUPABASE_URL}" \
   --var "CONTROL_SUPABASE_URL=${CONTROL_SUPABASE_URL}" \
-  --var "CIRCLEBOX_R2_BUCKET_RAW_NAME=${R2_BUCKET_NAME}"
+  --var "CIRCLEBOX_R2_BUCKET_RAW_NAME=${R2_BUCKET_NAME}")
+
+if [[ -n "$WORKER_PUBLIC_URL" ]]; then
+  deploy_cmd+=(--var "WORKER_PUBLIC_BASE_URL=${WORKER_PUBLIC_URL}")
+fi
+
+run_cmd "${deploy_cmd[@]}"
 
 if [[ -n "$WORKER_PUBLIC_URL" ]]; then
   log "Deployed. Worker base URL: $WORKER_PUBLIC_URL"

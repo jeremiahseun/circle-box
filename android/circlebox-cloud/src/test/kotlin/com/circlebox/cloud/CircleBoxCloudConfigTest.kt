@@ -12,8 +12,10 @@ class CircleBoxCloudConfigTest {
         )
 
         assertTrue(config.enableFragmentSync)
+        assertTrue(config.flushIntervalSec == 15L)
         assertTrue(config.enableAutoFlush)
         assertTrue(config.autoExportPendingOnStart)
+        assertTrue(config.immediateFlushOnHighSignal)
         assertTrue(!config.enableUsageBeacon)
         assertTrue(config.usageBeaconKey == null)
         assertTrue(config.usageBeaconMode == CircleBoxCloudUsageMode.CORE_CLOUD)

@@ -6,6 +6,8 @@ order: 4
 
 ## Install From Git Tag
 
+### 1) Add packages in `pubspec.yaml`
+
 ```yaml
 dependencies:
   circlebox_flutter:
@@ -25,10 +27,79 @@ dependencies:
       path: flutter/circlebox_adapters
 ```
 
+### 2) Fetch dependencies
+
+```bash
+flutter pub get
+```
+
+### 3) Link native CircleBox SDKs (required)
+
+`circlebox_flutter` is a bridge. Host app must include native SDKs.
+
+Android:
+
+1. Download release artifacts:
+   - `circlebox-sdk-release.aar`
+   - `circlebox-cloud-release.aar` (optional)
+2. Copy to `android/app/libs/`
+3. Add `flatDir` repo in `android/settings.gradle`
+4. Add AAR dependencies in `android/app/build.gradle`
+5. For cloud mode, add in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+```
+
+iOS:
+
+1. Open `ios/Runner.xcworkspace` in Xcode
+2. `File` -> `Add Package Dependencies...`
+3. URL: `https://github.com/jeremiahseun/circle-box.git`
+4. Version: `Up to Next Major` `0.3.1`
+5. Add products:
+   - `CircleBoxSDK` (required)
+   - `CircleBoxCloud` (optional)
+6. Run:
+
+```bash
+cd ios
+pod install --repo-update
+```
+
 ## Core Setup
 
+Initialize once in `main()` before `runApp`:
+
 ```dart
-await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
+import 'package:flutter/widgets.dart';
+import 'package:circlebox_flutter/circlebox_flutter.dart';
+import 'package:circlebox_cloud_flutter/circlebox_cloud_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CircleBox.start(config: const CircleBoxConfig(bufferCapacity: 200));
+
+  // Optional cloud mode.
+  await CircleBoxCloud.start(
+    const CircleBoxCloudConfig(
+      endpoint: Uri.parse('https://circlebox.seunjeremiah.workers.dev'),
+      ingestKey: 'cb_live_your_key',
+      flushIntervalSec: 15,
+      immediateFlushOnHighSignal: true,
+    ),
+  );
+
+  runApp(const MyApp());
+}
+```
+
+Call startup once. Do not call `CircleBox.start` from frequently rebuilt widgets.
+
+Then use APIs anywhere in app code:
+
+```dart
 await CircleBox.breadcrumb('checkout_started', attrs: {'flow': 'standard'});
 ```
 
@@ -56,6 +127,13 @@ await CircleBoxCloud.start(
   const CircleBoxCloudConfig(
     endpoint: Uri.parse('https://circlebox.seunjeremiah.workers.dev'),
     ingestKey: 'paste_ingest_key_from_control_plane',
+    flushIntervalSec: 15,
+    immediateFlushOnHighSignal: true,
   ),
 );
 ```
+
+Key rules:
+
+- `ingestKey` must be `cb_live_*`
+- `usageBeaconKey` must be `cb_usage_*` when usage beacon is enabled

@@ -6,6 +6,7 @@ import CrashDetailActions from "./crash-detail-actions";
 type CrashDetailProps = {
   reportId: string;
   searchParams?: DashboardSearchParams;
+  basePath?: string;
 };
 
 type EventGroup = {
@@ -13,10 +14,25 @@ type EventGroup = {
   events: DashboardEvent[];
 };
 
-export default async function CrashDetailPage({ reportId, searchParams = {} }: CrashDetailProps) {
+export default async function CrashDetailPage({
+  reportId,
+  searchParams = {},
+  basePath = "/dashboard/crashes",
+}: CrashDetailProps) {
   const scope = resolveDashboardScope(searchParams);
+  if (!scope.projectId) {
+    return (
+      <Card>
+        <div style={{ padding: 20 }}>
+          <h2 style={{ marginTop: 0 }}>Crash Detail: {reportId}</h2>
+          <p>No project selected. Provide <code>project_id</code> or set <code>DASHBOARD_DEFAULT_PROJECT_ID</code>.</p>
+        </div>
+      </Card>
+    );
+  }
+  const projectId = scope.projectId;
   const detail = await getReportDetail({
-    projectId: scope.projectId,
+    projectId,
     region: scope.region,
     reportId,
   });
@@ -27,7 +43,7 @@ export default async function CrashDetailPage({ reportId, searchParams = {} }: C
         <div style={{ padding: 20 }}>
           <h2 style={{ marginTop: 0 }}>Crash Detail: {reportId}</h2>
           <p>
-            No report found for project <code>{scope.projectId}</code> in region <code>{scope.region}</code>.
+            No report found for project <code>{projectId}</code> in region <code>{scope.region}</code>.
           </p>
         </div>
       </Card>
@@ -35,7 +51,7 @@ export default async function CrashDetailPage({ reportId, searchParams = {} }: C
   }
 
   const downloadQuery = new URLSearchParams({
-    project_id: scope.projectId,
+    project_id: projectId,
     region: scope.region,
   });
 
@@ -52,14 +68,14 @@ export default async function CrashDetailPage({ reportId, searchParams = {} }: C
         <div style={{ padding: 20 }}>
           <h2 style={{ marginTop: 0 }}>Crash Detail: {detail.report.id}</h2>
           <p>
-            <a href={`/dashboard/crashes?project_id=${scope.projectId}&region=${scope.region}`}>Back to Crashes</a>
+            <a href={`${basePath}?project_id=${projectId}&region=${scope.region}`}>Back to Crashes</a>
           </p>
-          <CrashDetailActions reportId={detail.report.id} projectId={scope.projectId} region={scope.region} />
+          <CrashDetailActions reportId={detail.report.id} projectId={projectId} region={scope.region} />
           <table>
             <tbody>
               <tr>
                 <td style={{ fontWeight: 600, width: 220 }}>Project</td>
-                <td>{scope.projectId}</td>
+                <td>{projectId}</td>
               </tr>
               <tr>
                 <td style={{ fontWeight: 600 }}>Region</td>

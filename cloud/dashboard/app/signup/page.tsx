@@ -6,15 +6,16 @@ type SignUpPageProps = {
 
 export default function SignUpPage({ searchParams = {} }: SignUpPageProps) {
   const error = firstValue(searchParams.error);
+  const inviteToken = firstValue(searchParams.invite_token) ?? firstValue(searchParams.token) ?? "";
 
   return (
     <section style={{ display: "grid", gap: 16, maxWidth: 680 }}>
       <Card>
         <div style={{ padding: 22 }}>
           <span className="badge">CircleBox Cloud</span>
-          <h1 style={{ marginBottom: 8 }}>Create Your Workspace</h1>
+          <h1 style={{ marginBottom: 8 }}>Create Your Account</h1>
           <p style={{ color: "var(--ink-soft)" }}>
-            Create your account, bootstrap your first project, and generate ingest + usage beacon keys.
+            Create your account first. After signup, choose whether to create a new project or join an existing project with an invite token.
           </p>
           <p style={{ color: "var(--ink-soft)", marginBottom: 0 }}>
             Already have an account? <a href="/login">Sign in</a>.
@@ -40,20 +41,21 @@ export default function SignUpPage({ searchParams = {} }: SignUpPageProps) {
               <input name="password" type="password" required minLength={8} style={{ width: "100%" }} />
             </label>
             <label>
-              Organization Name
-              <input name="organization_name" required placeholder="Acme Mobile" style={{ width: "100%" }} />
+              Workspace Name (optional)
+              <input name="organization_name" placeholder="Acme Mobile" style={{ width: "100%" }} />
             </label>
             <label>
-              Project Name
-              <input name="project_name" required placeholder="Acme Shopper App" style={{ width: "100%" }} />
+              Invite Token (optional)
+              <input
+                name="invite_token"
+                defaultValue={inviteToken}
+                placeholder="paste_invite_token_if_you_have_one"
+                style={{ width: "100%" }}
+              />
             </label>
-            <label>
-              Region
-              <select name="region" defaultValue="us" style={{ width: "100%" }}>
-                <option value="us">US</option>
-                <option value="eu">EU</option>
-              </select>
-            </label>
+            <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13 }}>
+              If you provide an invite token, you will join that workspace directly.
+            </p>
             <button className="btn btn-primary" type="submit">
               Create Account
             </button>

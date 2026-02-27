@@ -118,7 +118,8 @@ If a bad release is published:
 
 After deploy, validate key-management routes:
 
-1. Open `/signup`, create account/project.
-2. Confirm generated keys appear once on `/app/projects/<project_id>/keys`.
-3. Rotate and revoke one key.
-4. Confirm worker ingest accepts active key and rejects revoked key.
+1. Open `/signup`, create account.
+2. Complete `/app/onboarding` by creating a project (or joining via invite token).
+3. Confirm generated keys appear once on `/app/projects/<project_id>/keys`.
+4. Rotate and revoke one key.
+5. Confirm worker ingest accepts active key and rejects revoked key.

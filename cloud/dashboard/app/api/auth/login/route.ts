@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   });
 
   const projects = await listProjectsForUser(user.id);
-  const targetPath = projects.length > 0 ? `/app/projects/${projects[0].id}/keys?success=login` : "/app/projects/new?success=login";
+  const targetPath = projects.length > 0 ? `/app/projects/${projects[0].id}/keys?success=login` : "/app/onboarding?success=login";
   return NextResponse.redirect(new URL(targetPath, request.url), 303);
 }
 

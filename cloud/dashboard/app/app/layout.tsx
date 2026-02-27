@@ -22,8 +22,12 @@ export default async function AppLayout(props: { children: ReactNode }) {
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <a className="btn" href="/app/onboarding">Onboarding</a>
             <a className="btn" href="/app/projects/new">New Project</a>
-            <a className="btn" href="/dashboard/crashes">Dashboard</a>
+            <a className="btn" href={projects.length > 0 ? `/app/projects/${projects[0].id}/crashes` : "/app/onboarding"}>
+              Crash Explorer
+            </a>
+            <a className="btn" href="/app/invites/accept">Accept Invite</a>
             <a className="btn" href="/docs/cloud-quickstart">Cloud Docs</a>
           </div>
 

@@ -127,12 +127,20 @@ CircleBox supports three production operating modes:
 
 Control-plane onboarding:
 
-- UI: `/signup`, `/app/projects/<project_id>/keys`
+- UI: `/signup`, `/app/onboarding`, `/app/projects/<project_id>/keys`
 - CLI: `scripts/cli/circlebox.sh` (see `docs/cloud-cli.md`)
 
 ## Quick Start
 
 ### iOS (Swift Package)
+
+Add one package dependency (root URL):
+
+```swift
+.package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")
+```
+
+Select `CircleBoxSDK` (and optionally `CircleBoxCloud`, `CircleBoxIntegrations`) from that single package reference.
 
 Add `CircleBoxSDK` to your app, then call:
 

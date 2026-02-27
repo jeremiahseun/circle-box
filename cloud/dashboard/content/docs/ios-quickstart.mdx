@@ -12,6 +12,21 @@ Add the repository as a Swift Package dependency:
 .package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")
 ```
 
+### Xcode setup (app project)
+
+1. Open your iOS app in Xcode.
+2. `File` -> `Add Package Dependencies...`.
+3. URL: `https://github.com/jeremiahseun/circle-box.git`.
+4. Dependency rule: `Up to Next Major` with version `0.3.1`.
+5. Add products:
+   - `CircleBoxSDK` (required)
+   - `CircleBoxCloud` (optional cloud uploader)
+   - `CircleBoxIntegrations` (optional Sentry/PostHog mappers)
+
+Important:
+- Add the package URL once (`circle-box`) and select products from it.
+- Do not add separate package references that point to `ios/CircleBoxSDK` or `ios/CircleBoxCloud`, or Xcode will show duplicate target-name conflicts.
+
 Select products:
 
 - `CircleBoxSDK`
@@ -20,10 +35,53 @@ Select products:
 
 ## Core Setup
 
+Initialize once at startup.
+
+### SwiftUI app
+
+```swift
+import SwiftUI
+import CircleBoxSDK
+
+@main
+struct MyApp: App {
+  init() {
+    CircleBox.start(config: .default)
+  }
+
+  var body: some Scene {
+    WindowGroup {
+      ContentView()
+    }
+  }
+}
+```
+
+### UIKit app
+
+```swift
+import UIKit
+import CircleBoxSDK
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+  func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    CircleBox.start(config: .default)
+    return true
+  }
+}
+```
+
+Call `CircleBox.start` once per process launch.
+
+Then use breadcrumbs and export APIs anywhere in app code:
+
 ```swift
 import CircleBoxSDK
 
-CircleBox.start(config: .default)
 CircleBox.breadcrumb("checkout_started", attrs: ["flow": "standard"])
 ```
 
@@ -38,13 +96,17 @@ if CircleBox.hasPendingCrashReport() {
 
 ## Optional Cloud Upload
 
+Start cloud companion in the same startup path right after `CircleBox.start(...)`:
+
 ```swift
 import CircleBoxCloud
 
 CircleBoxCloud.start(
   config: CircleBoxCloudConfig(
     endpoint: URL(string: "https://circlebox.seunjeremiah.workers.dev")!,
-    ingestKey: "paste_ingest_key_from_control_plane"
+    ingestKey: "paste_ingest_key_from_control_plane",
+    flushIntervalSec: 15,
+    immediateFlushOnHighSignal: true
   )
 )
 ```

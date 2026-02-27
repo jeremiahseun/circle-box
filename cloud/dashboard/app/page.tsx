@@ -36,9 +36,9 @@ export default function HomePage() {
             <div className="cta-row">
               <a href="/docs/getting-started" className="btn btn-primary">Get Started</a>
               <a href="/docs/release-matrix" className="btn">Install Matrix</a>
-              <a href="/signup" className="btn">Create Project + Keys</a>
+              <a href="/signup" className="btn">Create Account</a>
               <a href="/pricing" className="btn">Pricing</a>
-              <a href="/dashboard/crashes" className="btn">Open Dashboard</a>
+              <a href="/login" className="btn">Open Cloud App</a>
             </div>
             <div className="hero-kpis">
               <span><strong>&lt;256KB</strong> target memory overhead</span>

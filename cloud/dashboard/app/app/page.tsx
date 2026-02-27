@@ -6,7 +6,7 @@ export default async function AppHomePage() {
   const session = await requireSession();
   const projects = await listProjectsForUser(session.userId);
   if (projects.length === 0) {
-    redirect("/app/projects/new");
+    redirect("/app/onboarding");
   }
   redirect(`/app/projects/${projects[0].id}/keys`);
 }

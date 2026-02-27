@@ -30,6 +30,15 @@ class CircleBoxCloud {
   static final _CircleBoxCloudLifecycleObserver _lifecycleObserver = _CircleBoxCloudLifecycleObserver();
 
   static Future<void> start(CircleBoxCloudConfig config) async {
+    final ingestKey = config.ingestKey.trim();
+    if (!ingestKey.startsWith('cb_live_')) {
+      throw StateError('ingestKey must use cb_live_ prefix');
+    }
+    final usageKey = config.usageBeaconKey?.trim();
+    if (usageKey != null && usageKey.isNotEmpty && !usageKey.startsWith('cb_usage_')) {
+      throw StateError('usageBeaconKey must use cb_usage_ prefix');
+    }
+
     _config = config;
     _paused = false;
     await _resolveQueueFile();

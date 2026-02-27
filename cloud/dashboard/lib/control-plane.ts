@@ -27,10 +27,31 @@ export type DashboardApiKey = {
   key_type: ControlKeyType;
   key_prefix: string;
   region_scope: "us" | "eu" | "auto";
+  max_reports_per_minute: number;
+  max_fragments_per_minute: number;
+  burst_limit: number;
   active: boolean;
   expires_at: string | null;
   created_at: string;
   last_used_at: string | null;
+};
+
+export type DashboardMember = {
+  user_id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  created_at: string;
+};
+
+export type DashboardInvite = {
+  id: string;
+  organization_id: string;
+  mode: "open_token";
+  role: "member";
+  expires_at: string;
+  created_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
 };
 
 export type CreatedApiKey = {
@@ -73,10 +94,9 @@ type InsertPreferences = {
 export async function createUserAccount(input: {
   email: string;
   password: string;
-  organizationName: string;
-  projectName: string;
-  region: ControlRegion;
-}): Promise<{ user: { id: string; email: string }; project: DashboardProject; keys: CreatedApiKey[] }> {
+  organizationName?: string;
+  inviteToken?: string;
+}): Promise<{ user: { id: string; email: string }; organizationId: string; joinedViaInvite: boolean }> {
   const email = normalizeEmail(input.email);
   if (!email) {
     throw new Error("invalid_email");
@@ -90,6 +110,14 @@ export async function createUserAccount(input: {
     throw new Error("account_already_exists");
   }
 
+  const normalizedInviteToken = input.inviteToken?.trim();
+  const invite = normalizedInviteToken
+    ? await readActiveInviteByToken(normalizedInviteToken)
+    : null;
+  if (normalizedInviteToken && !invite) {
+    throw new Error("invite_not_found_or_inactive");
+  }
+
   const userId = randomUUID();
   const passwordHash = hashPassword(input.password);
   await restInsert("app_users", [
@@ -100,8 +128,57 @@ export async function createUserAccount(input: {
     },
   ]);
 
+  if (invite) {
+    await restInsert(
+      "organization_members?on_conflict=organization_id,user_id",
+      [
+        {
+          organization_id: invite.organization_id,
+          user_id: userId,
+          role: "member",
+        },
+      ],
+      {
+        prefer: "resolution=merge-duplicates,return=minimal",
+      },
+    );
+
+    await patchById("organization_invites", invite.id, {
+      accepted_at: new Date().toISOString(),
+    });
+
+    await insertAuditEvent({
+      actionType: "signup",
+      actorUserId: userId,
+      organizationId: invite.organization_id,
+      metadata: {
+        email,
+        mode: "invite",
+        invite_id: invite.id,
+      },
+    });
+    await insertAuditEvent({
+      actionType: "invite_accept",
+      actorUserId: userId,
+      organizationId: invite.organization_id,
+      metadata: {
+        invite_id: invite.id,
+      },
+    });
+
+    return {
+      user: { id: userId, email },
+      organizationId: invite.organization_id,
+      joinedViaInvite: true,
+    };
+  }
+
+  const organizationName = normalizeDisplayName(
+    input.organizationName ?? `${email.split("@")[0]} Workspace`,
+    "CircleBox Workspace",
+  );
   const organization = await createOrganization({
-    name: input.organizationName,
+    name: organizationName,
   });
   await restInsert("organization_members", [
     {
@@ -110,30 +187,20 @@ export async function createUserAccount(input: {
       role: "owner",
     },
   ]);
-
-  const project = await createProject({
+  await insertAuditEvent({
+    actionType: "signup",
+    actorUserId: userId,
     organizationId: organization.id,
-    name: input.projectName,
-    region: input.region,
-  });
-
-  const ingestKey = await createApiKeyForProjectInternal({
-    projectId: project.id,
-    projectRegion: project.region,
-    keyType: "ingest",
-    actorUserId: userId,
-  });
-  const usageKey = await createApiKeyForProjectInternal({
-    projectId: project.id,
-    projectRegion: project.region,
-    keyType: "usage_beacon",
-    actorUserId: userId,
+    metadata: {
+      email,
+      mode: "owner",
+    },
   });
 
   return {
     user: { id: userId, email },
-    project,
-    keys: [ingestKey, usageKey],
+    organizationId: organization.id,
+    joinedViaInvite: false,
   };
 }
 
@@ -152,6 +219,13 @@ export async function authenticateUser(input: {
   if (!verifyPassword(input.password, user.password_hash)) {
     return null;
   }
+  await insertAuditEvent({
+    actionType: "login_success",
+    actorUserId: user.id,
+    metadata: {
+      email: user.email,
+    },
+  });
   return { id: user.id, email: user.email };
 }
 
@@ -195,6 +269,40 @@ export async function getProjectForUser(input: {
   return membership ? project : null;
 }
 
+export async function getProjectRoleForUser(input: {
+  userId: string;
+  projectId: string;
+}): Promise<"owner" | "admin" | "member" | null> {
+  const project = await getProjectForUser(input);
+  if (!project) {
+    return null;
+  }
+  const membership = await findMembership(input.userId, project.organization_id);
+  return membership?.role ?? null;
+}
+
+export async function recordProjectAuditEvent(input: {
+  userId: string;
+  projectId: string;
+  actionType: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const project = await getProjectForUser({
+    userId: input.userId,
+    projectId: input.projectId,
+  });
+  if (!project) {
+    return;
+  }
+  await insertAuditEvent({
+    actionType: input.actionType,
+    actorUserId: input.userId,
+    organizationId: project.organization_id,
+    projectId: project.id,
+    metadata: input.metadata,
+  });
+}
+
 export async function createProjectForUser(input: {
   userId: string;
   organizationId?: string;
@@ -230,7 +338,7 @@ export async function listApiKeysForProject(input: {
 
   const query = new URLSearchParams({
     project_id: `eq.${project.id}`,
-    select: "id,project_id,key_type,key_prefix,region_scope,active,expires_at,created_at,last_used_at",
+    select: "id,project_id,key_type,key_prefix,region_scope,max_reports_per_minute,max_fragments_per_minute,burst_limit,active,expires_at,created_at,last_used_at",
     order: "created_at.desc",
     limit: "200",
   });
@@ -249,6 +357,10 @@ export async function createApiKeyForProject(input: {
   });
   if (!project) {
     throw new Error("project_not_found_or_forbidden");
+  }
+  const membership = await findMembership(input.userId, project.organization_id);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("owner_required");
   }
   return createApiKeyForProjectInternal({
     projectId: project.id,
@@ -270,6 +382,10 @@ export async function rotateApiKey(input: {
   if (!project) {
     throw new Error("project_not_found_or_forbidden");
   }
+  const membership = await findMembership(input.userId, project.organization_id);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("owner_required");
+  }
 
   const key = await readApiKey(input.projectId, input.apiKeyId);
   if (!key) {
@@ -290,6 +406,16 @@ export async function rotateApiKey(input: {
       },
     },
   ]);
+  await insertAuditEvent({
+    actionType: "key_rotate",
+    actorUserId: input.userId,
+    organizationId: project.organization_id,
+    projectId: project.id,
+    metadata: {
+      key_id: key.id,
+      key_type: key.key_type,
+    },
+  });
 
   return createApiKeyForProjectInternal({
     projectId: key.project_id,
@@ -311,6 +437,10 @@ export async function revokeApiKey(input: {
   if (!project) {
     throw new Error("project_not_found_or_forbidden");
   }
+  const membership = await findMembership(input.userId, project.organization_id);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("owner_required");
+  }
 
   const key = await readApiKey(project.id, input.apiKeyId);
   if (!key) {
@@ -331,6 +461,16 @@ export async function revokeApiKey(input: {
       },
     },
   ]);
+  await insertAuditEvent({
+    actionType: "key_revoke",
+    actorUserId: input.userId,
+    organizationId: project.organization_id,
+    projectId: project.id,
+    metadata: {
+      key_id: key.id,
+      key_type: key.key_type,
+    },
+  });
 }
 
 export async function listUsageForProject(input: {
@@ -371,6 +511,213 @@ export async function listUsageForProject(input: {
   };
 }
 
+export async function listMembersForProject(input: {
+  userId: string;
+  projectId: string;
+}): Promise<DashboardMember[]> {
+  const project = await getProjectForUser({
+    userId: input.userId,
+    projectId: input.projectId,
+  });
+  if (!project) {
+    throw new Error("project_not_found_or_forbidden");
+  }
+
+  const membersQuery = new URLSearchParams({
+    organization_id: `eq.${project.organization_id}`,
+    select: "organization_id,user_id,role,created_at",
+    order: "created_at.asc",
+    limit: "500",
+  });
+  const rawMembers = await restSelect("organization_members", membersQuery);
+  const members = rawMembers.map(parseMemberRow).filter((row): row is DashboardMember => row !== null);
+
+  const uniqueUserIds = Array.from(new Set(members.map((member) => member.user_id)));
+  const emailMap = new Map<string, string>();
+  if (uniqueUserIds.length > 0) {
+    const usersQuery = new URLSearchParams({
+      id: `in.(${uniqueUserIds.join(",")})`,
+      select: "id,email",
+      limit: "500",
+    });
+    const users = await restSelect("app_users", usersQuery);
+    for (const row of users) {
+      const id = asString(row.id);
+      const email = asString(row.email);
+      if (id && email) {
+        emailMap.set(id, email);
+      }
+    }
+  }
+
+  return members.map((member) => ({
+    ...member,
+    email: emailMap.get(member.user_id) ?? "unknown@pending",
+  }));
+}
+
+export async function listInvitesForProject(input: {
+  userId: string;
+  projectId: string;
+}): Promise<DashboardInvite[]> {
+  const project = await getProjectForUser({
+    userId: input.userId,
+    projectId: input.projectId,
+  });
+  if (!project) {
+    throw new Error("project_not_found_or_forbidden");
+  }
+
+  const query = new URLSearchParams({
+    organization_id: `eq.${project.organization_id}`,
+    select: "id,organization_id,email,role,expires_at,created_at,accepted_at,revoked_at",
+    order: "created_at.desc",
+    limit: "200",
+  });
+  const rows = await restSelect("organization_invites", query);
+  return rows.map(parseInviteRow).filter((row): row is DashboardInvite => row !== null);
+}
+
+export async function createInviteForProject(input: {
+  userId: string;
+  projectId: string;
+  expiresInDays?: number;
+}): Promise<{ invite: DashboardInvite; inviteToken: string }> {
+  const project = await getProjectForUser({
+    userId: input.userId,
+    projectId: input.projectId,
+  });
+  if (!project) {
+    throw new Error("project_not_found_or_forbidden");
+  }
+
+  const membership = await findMembership(input.userId, project.organization_id);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("owner_required");
+  }
+
+  const inviteToken = randomBytes(24).toString("hex");
+  const expiresInDays = Math.max(1, Math.min(input.expiresInDays ?? 7, 30));
+  const expiresAt = new Date(Date.now() + (expiresInDays * 24 * 60 * 60 * 1000)).toISOString();
+  const inviteId = randomUUID();
+
+  await restInsert("organization_invites", [
+    {
+      id: inviteId,
+      organization_id: project.organization_id,
+      email: "open_invite",
+      role: "member",
+      invite_token_hash: sha256Hex(inviteToken),
+      invited_by: input.userId,
+      expires_at: expiresAt,
+    },
+  ]);
+
+  await insertAuditEvent({
+    actionType: "invite_create",
+    actorUserId: input.userId,
+    organizationId: project.organization_id,
+    projectId: project.id,
+    metadata: {
+      mode: "open_token",
+      expires_at: expiresAt,
+    },
+  });
+
+  const invite = await readInviteById(project.organization_id, inviteId);
+  if (!invite) {
+    throw new Error("invite_create_failed");
+  }
+  return {
+    invite,
+    inviteToken,
+  };
+}
+
+export async function revokeInviteForProject(input: {
+  userId: string;
+  projectId: string;
+  inviteId: string;
+}): Promise<void> {
+  const project = await getProjectForUser({
+    userId: input.userId,
+    projectId: input.projectId,
+  });
+  if (!project) {
+    throw new Error("project_not_found_or_forbidden");
+  }
+
+  const membership = await findMembership(input.userId, project.organization_id);
+  if (!membership || membership.role !== "owner") {
+    throw new Error("owner_required");
+  }
+
+  const invite = await readInviteById(project.organization_id, input.inviteId);
+  if (!invite) {
+    throw new Error("invite_not_found");
+  }
+
+  await patchById("organization_invites", input.inviteId, {
+    revoked_at: new Date().toISOString(),
+  });
+
+  await insertAuditEvent({
+    actionType: "invite_revoke",
+    actorUserId: input.userId,
+    organizationId: project.organization_id,
+    projectId: project.id,
+    metadata: {
+      invite_id: input.inviteId,
+      mode: invite.mode,
+    },
+  });
+}
+
+export async function acceptInviteForUser(input: {
+  userId: string;
+  inviteToken: string;
+}): Promise<{ organizationId: string }> {
+  const token = input.inviteToken.trim();
+  if (token.length < 16) {
+    throw new Error("invalid_invite_token");
+  }
+  const invite = await readActiveInviteByToken(token);
+  if (!invite) {
+    throw new Error("invite_not_found");
+  }
+
+  await restInsert(
+    "organization_members?on_conflict=organization_id,user_id",
+    [
+      {
+        organization_id: invite.organization_id,
+        user_id: input.userId,
+        role: "member",
+      },
+    ],
+    {
+      prefer: "resolution=merge-duplicates,return=minimal",
+    },
+  );
+  await patchById("organization_invites", invite.id, {
+    accepted_at: new Date().toISOString(),
+  });
+
+  await insertAuditEvent({
+    actionType: "invite_accept",
+    actorUserId: input.userId,
+    organizationId: invite.organization_id,
+    metadata: {
+      invite_id: invite.id,
+      mode: "open_token",
+    },
+  });
+
+  return {
+    organizationId: invite.organization_id,
+  };
+}
+
 type InternalCreateApiKeyInput = {
   projectId: string;
   projectRegion: ControlRegion;
@@ -392,6 +739,9 @@ async function createApiKeyForProjectInternal(input: InternalCreateApiKeyInput):
     key_prefix: material.prefix,
     hashed_secret: sha256Hex(material.secret),
     region_scope: material.regionScope,
+    max_reports_per_minute: 120,
+    max_fragments_per_minute: 240,
+    burst_limit: 40,
     active: true,
     created_by: input.actorUserId,
   };
@@ -410,6 +760,15 @@ async function createApiKeyForProjectInternal(input: InternalCreateApiKeyInput):
       },
     },
   ]);
+  await insertAuditEvent({
+    actionType: "key_create",
+    actorUserId: input.actorUserId,
+    projectId: input.projectId,
+    metadata: {
+      key_type: input.keyType,
+      key_prefix: material.prefix,
+    },
+  });
 
   const created = await readApiKey(input.projectId, row.id);
   if (!created) {
@@ -470,6 +829,19 @@ async function createProject(input: {
       if (!created) {
         throw new Error("project_create_failed");
       }
+      await restInsert(
+        "project_retention_policies",
+        [
+          {
+            project_id: created.id,
+            raw_retention_days: 30,
+            aggregate_retention_days: 180,
+          },
+        ],
+        {
+          prefer: "resolution=ignore-duplicates,return=minimal",
+        },
+      );
       return created;
     } catch (error) {
       if (!isConflictError(error)) {
@@ -498,7 +870,7 @@ async function readApiKey(projectId: string, apiKeyId: string): Promise<Dashboar
   const query = new URLSearchParams({
     id: `eq.${apiKeyId}`,
     project_id: `eq.${projectId}`,
-    select: "id,project_id,key_type,key_prefix,region_scope,active,expires_at,created_at,last_used_at",
+    select: "id,project_id,key_type,key_prefix,region_scope,max_reports_per_minute,max_fragments_per_minute,burst_limit,active,expires_at,created_at,last_used_at",
     limit: "1",
   });
   const rows = await restSelect("api_keys", query);
@@ -506,6 +878,44 @@ async function readApiKey(projectId: string, apiKeyId: string): Promise<Dashboar
     return null;
   }
   return parseApiKeyRow(rows[0]);
+}
+
+async function readInviteById(organizationId: string, inviteId: string): Promise<DashboardInvite | null> {
+  const query = new URLSearchParams({
+    id: `eq.${inviteId}`,
+    organization_id: `eq.${organizationId}`,
+    select: "id,organization_id,email,role,expires_at,created_at,accepted_at,revoked_at",
+    limit: "1",
+  });
+  const rows = await restSelect("organization_invites", query);
+  if (rows.length === 0) {
+    return null;
+  }
+  return parseInviteRow(rows[0]);
+}
+
+async function readActiveInviteByToken(inviteToken: string): Promise<DashboardInvite | null> {
+  const hashed = sha256Hex(inviteToken.trim());
+  const query = new URLSearchParams({
+    invite_token_hash: `eq.${hashed}`,
+    select: "id,organization_id,email,role,expires_at,created_at,accepted_at,revoked_at",
+    limit: "1",
+  });
+  const rows = await restSelect("organization_invites", query);
+  if (rows.length === 0) {
+    return null;
+  }
+  const invite = parseInviteRow(rows[0]);
+  if (!invite) {
+    return null;
+  }
+  if (invite.revoked_at) {
+    return null;
+  }
+  if (Date.parse(invite.expires_at) <= Date.now()) {
+    return null;
+  }
+  return invite;
 }
 
 async function findUserByEmail(email: string): Promise<ControlUser | null> {
@@ -688,6 +1098,28 @@ async function patchById(resource: string, id: string, patch: Record<string, unk
   }
 }
 
+async function insertAuditEvent(input: {
+  actionType: string;
+  actorUserId?: string;
+  organizationId?: string;
+  projectId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await restInsert("audit_events", [
+      {
+        action_type: input.actionType,
+        actor_user_id: input.actorUserId ?? null,
+        organization_id: input.organizationId ?? null,
+        project_id: input.projectId ?? null,
+        metadata: input.metadata ?? {},
+      },
+    ]);
+  } catch {
+    // Audit writes are best-effort and should not break user workflows.
+  }
+}
+
 function parseProjectRow(row: Record<string, unknown>): DashboardProject | null {
   const id = asString(row.id);
   const organizationId = asString(row.organization_id);
@@ -727,6 +1159,9 @@ function parseApiKeyRow(row: Record<string, unknown>): DashboardApiKey | null {
   const keyType = asString(row.key_type);
   const keyPrefix = asString(row.key_prefix);
   const regionScope = asString(row.region_scope);
+  const maxReportsPerMinute = asNumber(row.max_reports_per_minute) ?? 120;
+  const maxFragmentsPerMinute = asNumber(row.max_fragments_per_minute) ?? 240;
+  const burstLimit = asNumber(row.burst_limit) ?? 40;
   const active = typeof row.active === "boolean" ? row.active : null;
   const expiresAt = asNullableString(row.expires_at);
   const createdAt = asString(row.created_at);
@@ -750,10 +1185,51 @@ function parseApiKeyRow(row: Record<string, unknown>): DashboardApiKey | null {
     key_type: keyType,
     key_prefix: keyPrefix,
     region_scope: regionScope,
+    max_reports_per_minute: maxReportsPerMinute,
+    max_fragments_per_minute: maxFragmentsPerMinute,
+    burst_limit: burstLimit,
     active,
     expires_at: expiresAt,
     created_at: createdAt,
     last_used_at: lastUsedAt,
+  };
+}
+
+function parseMemberRow(row: Record<string, unknown>): DashboardMember | null {
+  const userId = asString(row.user_id);
+  const role = asString(row.role);
+  const createdAt = asString(row.created_at);
+  if (!userId || !createdAt || (role !== "owner" && role !== "admin" && role !== "member")) {
+    return null;
+  }
+  return {
+    user_id: userId,
+    email: "unknown@pending",
+    role,
+    created_at: createdAt,
+  };
+}
+
+function parseInviteRow(row: Record<string, unknown>): DashboardInvite | null {
+  const id = asString(row.id);
+  const organizationId = asString(row.organization_id);
+  const role = asString(row.role);
+  const expiresAt = asString(row.expires_at);
+  const createdAt = asString(row.created_at);
+  const acceptedAt = asNullableString(row.accepted_at);
+  const revokedAt = asNullableString(row.revoked_at);
+  if (!id || !organizationId || role !== "member" || !expiresAt || !createdAt) {
+    return null;
+  }
+  return {
+    id,
+    organization_id: organizationId,
+    mode: "open_token",
+    role,
+    expires_at: expiresAt,
+    created_at: createdAt,
+    accepted_at: acceptedAt,
+    revoked_at: revokedAt,
   };
 }
 

@@ -34,9 +34,15 @@ type CircleBoxEnvelopeV2 = {
 };
 
 type ProjectAuthContext = {
+  keyId: string;
   projectId: string;
   region: CircleBoxRegion;
   keyType: CircleBoxKeyType;
+  rateLimitPolicy: {
+    maxReportsPerMinute: number;
+    maxFragmentsPerMinute: number;
+    burstLimit: number;
+  };
 };
 
 type RegionalSupabaseConfig = {
@@ -56,6 +62,9 @@ type ApiKeyRecord = {
   region_scope: "us" | "eu" | "auto";
   hashed_secret: string;
   expires_at: string | null;
+  max_reports_per_minute: number;
+  max_fragments_per_minute: number;
+  burst_limit: number;
 };
 
 type ParsedApiKey = {
@@ -84,6 +93,8 @@ export interface Env {
   CONTROL_SUPABASE_SERVICE_ROLE_KEY?: string;
   DASHBOARD_WORKER_TOKEN?: string;
   DASHBOARD_SHARED_SECRET?: string;
+  WORKER_PUBLIC_BASE_URL?: string;
+  SYNTHETIC_ALERT_WEBHOOK_URL?: string;
   CIRCLEBOX_R2_BUCKET_RAW_NAME?: string;
   CB_REPORTS_RAW: R2Bucket;
 }
@@ -97,10 +108,26 @@ const GZIP_MAGIC_0 = 0x1f;
 const GZIP_MAGIC_1 = 0x8b;
 const KEY_CACHE_TTL_MS = 60_000;
 const keyAuthCache = new Map<string, { context: ProjectAuthContext; expiresAtUnixMs: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const DEFAULT_MAX_REPORTS_PER_MINUTE = 120;
+const DEFAULT_MAX_FRAGMENTS_PER_MINUTE = 240;
+const DEFAULT_BURST_LIMIT = 40;
+const rateLimitCache = new Map<string, {
+  windowStartUnixMs: number;
+  reportCount: number;
+  fragmentCount: number;
+}>();
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/v1/health") {
+      return json(200, {
+        status: "ok",
+        timestamp_unix_ms: Date.now(),
+      });
+    }
 
     if (url.pathname.startsWith("/v1/dashboard/")) {
       return handleDashboardRoute(request, env, url);
@@ -149,10 +176,62 @@ export default {
       });
     }
 
+    const rateLimitResult = checkAndConsumeRateLimit(auth, url.pathname);
+    if (!rateLimitResult.allowed) {
+      return json(
+        429,
+        {
+          error: "rate_limited",
+          code: rateLimitResult.code,
+          retry_after_sec: rateLimitResult.retryAfterSec,
+        },
+        {
+          "retry-after": String(rateLimitResult.retryAfterSec),
+        },
+      );
+    }
+
     if (url.pathname === "/v1/ingest/report") {
       return handleIngestReport(request, env, auth);
     }
     return handleIngestFragment(request, env, auth);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const baseUrl = trimTrailingSlash((env.WORKER_PUBLIC_BASE_URL ?? "").trim());
+    if (!baseUrl) {
+      return;
+    }
+
+    let ok = false;
+    let status = 0;
+    let message = "ok";
+    try {
+      const response = await fetch(`${baseUrl}/v1/health`, {
+        method: "GET",
+      });
+      status = response.status;
+      ok = response.ok;
+      if (!ok) {
+        message = `health_status_${status}`;
+      }
+    } catch (error) {
+      ok = false;
+      message = error instanceof Error ? error.message : "health_fetch_failed";
+    }
+
+    if (ok) {
+      return;
+    }
+
+    await sendSyntheticAlert(env, {
+      service: "circlebox-worker",
+      status: "fail",
+      http_status: status,
+      message,
+      checked_url: `${baseUrl}/v1/health`,
+      checked_at_unix_ms: Date.now(),
+    });
   },
 };
 
@@ -760,6 +839,89 @@ async function readApiKeyRecords(
     key_prefix: `eq.${keyPrefix}`,
     key_type: `eq.${keyType}`,
     active: "is.true",
+    select: "id,project_id,key_type,region_scope,hashed_secret,expires_at,max_reports_per_minute,max_fragments_per_minute,burst_limit",
+  });
+
+  const response = await fetch(`${control.url}/rest/v1/api_keys?${query.toString()}`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${control.serviceRoleKey}`,
+      apikey: control.serviceRoleKey,
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const body = await safeReadBody(response);
+    if (
+      response.status === 400 &&
+      (body.includes("max_reports_per_minute") || body.includes("max_fragments_per_minute") || body.includes("burst_limit"))
+    ) {
+      return readApiKeyRecordsLegacy(control, keyPrefix, keyType);
+    }
+    throw new Error(`rest_select_failed:api_keys:${response.status}:${body}`);
+  }
+
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  return rows
+    .map((row) => {
+      const id = asString(row["id"]);
+      const projectId = asString(row["project_id"]);
+      const rowKeyType = asString(row["key_type"]);
+      const regionScope = asString(row["region_scope"]);
+      const hashedSecret = asString(row["hashed_secret"]);
+      const expiresAt = asNullableString(row["expires_at"]);
+      const maxReportsPerMinute = clampNumberOrDefault(
+        row["max_reports_per_minute"],
+        DEFAULT_MAX_REPORTS_PER_MINUTE,
+        1,
+        20_000,
+      );
+      const maxFragmentsPerMinute = clampNumberOrDefault(
+        row["max_fragments_per_minute"],
+        DEFAULT_MAX_FRAGMENTS_PER_MINUTE,
+        1,
+        50_000,
+      );
+      const burstLimit = clampNumberOrDefault(
+        row["burst_limit"],
+        DEFAULT_BURST_LIMIT,
+        0,
+        10_000,
+      );
+      if (!id || !projectId || !rowKeyType || !regionScope || !hashedSecret) {
+        return null;
+      }
+      if ((rowKeyType !== "ingest" && rowKeyType !== "usage_beacon")) {
+        return null;
+      }
+      if ((regionScope !== "us" && regionScope !== "eu" && regionScope !== "auto")) {
+        return null;
+      }
+
+      return {
+        id,
+        project_id: projectId,
+        key_type: rowKeyType,
+        region_scope: regionScope,
+        hashed_secret: hashedSecret,
+        expires_at: expiresAt,
+        max_reports_per_minute: maxReportsPerMinute,
+        max_fragments_per_minute: maxFragmentsPerMinute,
+        burst_limit: burstLimit,
+      } as ApiKeyRecord;
+    })
+    .filter((item): item is ApiKeyRecord => item !== null);
+}
+
+async function readApiKeyRecordsLegacy(
+  control: ControlPlaneSupabaseConfig,
+  keyPrefix: string,
+  keyType: CircleBoxKeyType,
+): Promise<ApiKeyRecord[]> {
+  const query = new URLSearchParams({
+    key_prefix: `eq.${keyPrefix}`,
+    key_type: `eq.${keyType}`,
+    active: "is.true",
     select: "id,project_id,key_type,region_scope,hashed_secret,expires_at",
   });
 
@@ -802,6 +964,9 @@ async function readApiKeyRecords(
         region_scope: regionScope,
         hashed_secret: hashedSecret,
         expires_at: expiresAt,
+        max_reports_per_minute: DEFAULT_MAX_REPORTS_PER_MINUTE,
+        max_fragments_per_minute: DEFAULT_MAX_FRAGMENTS_PER_MINUTE,
+        burst_limit: DEFAULT_BURST_LIMIT,
       } as ApiKeyRecord;
     })
     .filter((item): item is ApiKeyRecord => item !== null);
@@ -1093,9 +1258,15 @@ async function authenticateApiKey(
     : matched.region_scope;
 
   const context: ProjectAuthContext = {
+    keyId: matched.id,
     projectId: normalizeProjectId(matched.project_id),
     region,
     keyType: expectedType,
+    rateLimitPolicy: {
+      maxReportsPerMinute: matched.max_reports_per_minute || DEFAULT_MAX_REPORTS_PER_MINUTE,
+      maxFragmentsPerMinute: matched.max_fragments_per_minute || DEFAULT_MAX_FRAGMENTS_PER_MINUTE,
+      burstLimit: matched.burst_limit || DEFAULT_BURST_LIMIT,
+    },
   };
   keyAuthCache.set(rawKey, {
     context,
@@ -1117,9 +1288,67 @@ function authenticateLegacyIngestKey(rawKey: string): ProjectAuthContext {
   const projectToken = parts[2] ?? "project_demo";
 
   return {
+    keyId: `legacy:${projectToken}`,
     projectId: normalizeProjectId(projectToken),
     region,
     keyType: "ingest",
+    rateLimitPolicy: {
+      maxReportsPerMinute: DEFAULT_MAX_REPORTS_PER_MINUTE,
+      maxFragmentsPerMinute: DEFAULT_MAX_FRAGMENTS_PER_MINUTE,
+      burstLimit: DEFAULT_BURST_LIMIT,
+    },
+  };
+}
+
+function checkAndConsumeRateLimit(
+  auth: ProjectAuthContext,
+  path: string,
+): {
+  allowed: boolean;
+  code?: string;
+  retryAfterSec: number;
+} {
+  const key = `${auth.projectId}:${auth.keyId}`;
+  const now = Date.now();
+  const existing = rateLimitCache.get(key);
+  const counter = (!existing || (now - existing.windowStartUnixMs) >= RATE_LIMIT_WINDOW_MS)
+    ? {
+      windowStartUnixMs: now,
+      reportCount: 0,
+      fragmentCount: 0,
+    }
+    : existing;
+
+  const retryAfterSec = Math.max(1, Math.ceil((counter.windowStartUnixMs + RATE_LIMIT_WINDOW_MS - now) / 1000));
+  const reportLimit = Math.max(1, auth.rateLimitPolicy.maxReportsPerMinute + auth.rateLimitPolicy.burstLimit);
+  const fragmentLimit = Math.max(1, auth.rateLimitPolicy.maxFragmentsPerMinute + auth.rateLimitPolicy.burstLimit);
+
+  if (path === "/v1/ingest/report") {
+    if (counter.reportCount >= reportLimit) {
+      rateLimitCache.set(key, counter);
+      return {
+        allowed: false,
+        code: "report_rate_limit_exceeded",
+        retryAfterSec,
+      };
+    }
+    counter.reportCount += 1;
+  } else {
+    if (counter.fragmentCount >= fragmentLimit) {
+      rateLimitCache.set(key, counter);
+      return {
+        allowed: false,
+        code: "fragment_rate_limit_exceeded",
+        retryAfterSec,
+      };
+    }
+    counter.fragmentCount += 1;
+  }
+
+  rateLimitCache.set(key, counter);
+  return {
+    allowed: true,
+    retryAfterSec,
   };
 }
 
@@ -1355,6 +1584,18 @@ function clampNumber(value: unknown, minValue: number, maxValue: number): number
   return clamp(Math.floor(value), minValue, maxValue);
 }
 
+function clampNumberOrDefault(
+  value: unknown,
+  defaultValue: number,
+  minValue: number,
+  maxValue: number,
+): number {
+  if (typeof value !== "number" || Number.isNaN(value) || !Number.isFinite(value)) {
+    return clamp(defaultValue, minValue, maxValue);
+  }
+  return clamp(Math.floor(value), minValue, maxValue);
+}
+
 function buildReportStoragePath(
   projectId: string,
   reportId: string,
@@ -1429,11 +1670,38 @@ function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copied.buffer;
 }
 
-function json(status: number, payload: Record<string, unknown>): Response {
+async function sendSyntheticAlert(
+  env: Env,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const webhookUrl = (env.SYNTHETIC_ALERT_WEBHOOK_URL ?? "").trim();
+  if (!webhookUrl) {
+    return;
+  }
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Synthetic alerts are best-effort and must not throw.
+  }
+}
+
+function json(
+  status: number,
+  payload: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
       "content-type": "application/json",
+      ...extraHeaders,
     },
   });
 }

@@ -55,6 +55,16 @@ The current phase extends Phase 3A with delivery and developer activation:
 6. Smoke coverage now includes:
    - `scripts/smoke_test_worker_ingest.sh` for ingest + dashboard download-token flow
    - `scripts/smoke_test_worker_usage_telemetry.sh` for usage telemetry + key lifecycle negatives
+7. MVP guardrails added:
+   - per-key ingest throttling policy fields (`max_reports_per_minute`, `max_fragments_per_minute`, `burst_limit`)
+   - worker-side `429 rate_limited` enforcement with `retry-after`
+   - owner/member invite flow (`/app/projects/[projectId]/invites`, `/app/invites/accept`)
+   - project members page (`/app/projects/[projectId]/members`)
+   - retention policy table defaults (`30d raw`, `180d aggregates`)
+   - generic control-plane audit event stream (`audit_events`)
+8. Operations runbook and synthetic checks added:
+   - `docs/operations-runbook.md`
+   - `scripts/synthetic_worker_check.sh`
 
 This plan is optimized for:
 - **Cost cap:** `<$1k/month` infra at launch

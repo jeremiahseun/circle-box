@@ -13,7 +13,7 @@ The dashboard reads crash data from regional Supabase data planes and requests s
 
 Copy `.env.local.example` to `.env.local` and fill all values:
 
-- `DASHBOARD_DEFAULT_PROJECT_ID`
+- `DASHBOARD_DEFAULT_PROJECT_ID` (optional; used for legacy `/dashboard/crashes` without query params)
 - `DASHBOARD_DEFAULT_REGION` (`us` or `eu`)
 - `DASHBOARD_US_SUPABASE_URL`
 - `DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY`
@@ -21,6 +21,7 @@ Copy `.env.local.example` to `.env.local` and fill all values:
 - `DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_WORKER_BASE_URL`
 - `DASHBOARD_WORKER_TOKEN`
+- `DASHBOARD_PUBLIC_BASE_URL` (used for canonical/SEO metadata)
 - `DASHBOARD_CONTROL_SUPABASE_URL`
 - `DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_APP_SESSION_SECRET`
@@ -62,8 +63,12 @@ Notes:
 - `/dashboard/crashes/[reportId]` shows report metadata plus ordered `report_event_index` timeline.
 - `project_id` and `region` can be overridden via query params for testing.
 - Raw report download uses a server-side route that requests a short-lived download token from the worker, then redirects to the signed download URL.
-- `/signup` creates account + org + first project + ingest/usage keys.
-- `/app/projects/[projectId]/keys` supports create/rotate/revoke and one-time key preview.
+- `/signup` creates account only, then routes to `/app/onboarding` for create-project vs join-project choice.
+- `/app/projects/[projectId]/crashes` provides member-scoped crash list/detail for the selected project.
+- `/app/projects/[projectId]/keys` supports create/rotate/revoke (owner-only) and one-time key preview.
+- `/app/projects/[projectId]/members` lists owner/member workspace access.
+- `/app/projects/[projectId]/invites` supports token invite creation + revoke flow (owner-only, emailless token sharing).
+- `/app/invites/accept` lets authenticated users accept invite tokens.
 - `/app/projects/[projectId]/usage` shows ingest usage and optional usage beacon aggregates.
 
 Legacy routes `/crashes` and `/crashes/[reportId]` redirect to `/dashboard/*`.

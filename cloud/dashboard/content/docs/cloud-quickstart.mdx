@@ -20,6 +20,8 @@ wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put CONTROL_SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put DASHBOARD_WORKER_TOKEN
 wrangler secret put DASHBOARD_SHARED_SECRET
+# Optional synthetic alert webhook
+wrangler secret put SYNTHETIC_ALERT_WEBHOOK_URL
 ```
 
 ## Deploy Worker
@@ -40,7 +42,7 @@ scripts/deploy_phase3_cloud.sh --ingest-key "<ingest_key_from_/app/projects/.../
 
 Set these in `cloud/dashboard/.env.local`:
 
-- `DASHBOARD_DEFAULT_PROJECT_ID`
+- `DASHBOARD_DEFAULT_PROJECT_ID` (optional)
 - `DASHBOARD_DEFAULT_REGION`
 - `DASHBOARD_US_SUPABASE_URL`
 - `DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY`
@@ -48,16 +50,21 @@ Set these in `cloud/dashboard/.env.local`:
 - `DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_WORKER_BASE_URL`
 - `DASHBOARD_WORKER_TOKEN`
+- `DASHBOARD_PUBLIC_BASE_URL`
 - `DASHBOARD_CONTROL_SUPABASE_URL`
 - `DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_APP_SESSION_SECRET`
 
 ## Control Plane Onboarding
 
-1. Open `/signup` and create your account + first project.
-2. Copy generated `ingest` key.
-3. Configure SDK cloud uploader with worker endpoint + ingest key.
-4. Open `/app/projects/<project_id>/keys` to rotate/revoke/create additional keys.
+1. Open `/signup` and create your account.
+2. On `/app/onboarding`, choose:
+   - Create New Project
+   - Join Existing Project (invite token)
+3. Copy generated `ingest` key from `/app/projects/<project_id>/keys`.
+4. Configure SDK cloud uploader with worker endpoint + ingest key.
+5. Open `/app/projects/<project_id>/keys` to rotate/revoke/create additional keys.
+6. Owners create token invites from `/app/projects/<project_id>/invites`; teammates accept on `/app/invites/accept`.
 
 ## CLI Alternative
 

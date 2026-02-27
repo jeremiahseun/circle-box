@@ -32,7 +32,10 @@ export default async function ProjectUsagePage({ params }: ProjectUsagePageProps
             Billing meter: reports + storage. Usage beacon telemetry is optional and off by default.
           </p>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
-            <a href={`/app/projects/${project.id}/keys`}>Back to keys</a>
+            <a href={`/app/projects/${project.id}/crashes`}>Crashes</a> |{" "}
+            <a href={`/app/projects/${project.id}/keys`}>Keys</a> |{" "}
+            <a href={`/app/projects/${project.id}/members`}>Members</a> |{" "}
+            <a href={`/app/projects/${project.id}/invites`}>Invites</a>
           </p>
         </div>
       </Card>
