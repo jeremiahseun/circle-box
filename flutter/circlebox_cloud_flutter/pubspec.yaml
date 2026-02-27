@@ -1,6 +1,6 @@
 name: circlebox_cloud_flutter
 description: CircleBox Cloud companion uploader for Flutter.
-version: 0.3.0
+version: 0.3.1
 publish_to: "none"
 homepage: https://github.com/jeremiahseun/circlebox
 repository: https://github.com/jeremiahseun/circlebox
@@ -13,7 +13,10 @@ dependencies:
   flutter:
     sdk: flutter
   circlebox_flutter:
-    path: ../circlebox_flutter
+    git:
+      url: https://github.com/jeremiahseun/circle-box.git
+      ref: v0.3.1
+      path: flutter/circlebox_flutter
   crypto: ^3.0.3
   path_provider: ^2.1.5
 

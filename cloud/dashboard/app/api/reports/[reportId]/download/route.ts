@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getProjectForUser, recordProjectAuditEvent } from "../../../../../lib/control-plane";
 import { resolveDashboardScope } from "../../../../../lib/env";
+import { getSession } from "../../../../../lib/session";
 
 type RouteContext = {
   params: {
@@ -8,10 +10,31 @@ type RouteContext = {
 };
 
 export async function GET(request: NextRequest, context: RouteContext) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const scope = resolveDashboardScope({
     project_id: request.nextUrl.searchParams.get("project_id") ?? undefined,
     region: request.nextUrl.searchParams.get("region") ?? undefined,
   });
+  if (!scope.projectId) {
+    return NextResponse.json(
+      {
+        error: "missing_project_scope",
+        message: "Provide project_id or configure DASHBOARD_DEFAULT_PROJECT_ID",
+      },
+      { status: 400 },
+    );
+  }
+  const project = await getProjectForUser({
+    userId: session.userId,
+    projectId: scope.projectId,
+  });
+  if (!project) {
+    return NextResponse.json({ error: "forbidden_project_access" }, { status: 403 });
+  }
 
   const workerBaseUrl = process.env.DASHBOARD_WORKER_BASE_URL?.trim();
   const workerToken = process.env.DASHBOARD_WORKER_TOKEN?.trim();
@@ -63,6 +86,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       { status: 502 },
     );
   }
+
+  await recordProjectAuditEvent({
+    userId: session.userId,
+    projectId: scope.projectId,
+    actionType: "raw_report_download",
+    metadata: {
+      report_id: reportId,
+      region: scope.region,
+    },
+  });
 
   return NextResponse.redirect(downloadUrl, 307);
 }

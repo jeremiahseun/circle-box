@@ -1,3 +1,8 @@
+import 'dart:async';
+
+import 'package:circlebox_flutter/circlebox_flutter.dart';
+
+import 'circlebox_adapter_models.dart';
 import 'circlebox_export_parser.dart';
 import 'circlebox_posthog_adapter.dart';
 import 'circlebox_sentry_adapter.dart';
@@ -40,5 +45,52 @@ class CircleBoxAdapterForwarder {
         postHogEventName: postHogEventName,
       );
     }
+  }
+
+  static StreamSubscription<CircleBoxDebugEvent> forwardRealtime({
+    CircleBoxSentryBreadcrumbSink? onSentryBreadcrumb,
+    CircleBoxPostHogCaptureSink? onPostHogCapture,
+    bool forwardAll = false,
+    Set<String> includeEventTypes = const <String>{},
+    int pollIntervalMs = 500,
+    int maxEvents = 200,
+    String postHogEventName = 'circlebox_realtime_event',
+  }) {
+    return CircleBox.eventStream(
+      filter: CircleBoxRealtimeFilter(
+        forwardAll: forwardAll,
+        includeEventTypes: includeEventTypes,
+      ),
+      pollInterval: Duration(milliseconds: pollIntervalMs),
+      maxEvents: maxEvents,
+    ).listen((event) {
+      final adapterEvent = CircleBoxAdapterEvent(
+        seq: event.seq,
+        timestampUnixMs: event.timestampUnixMs,
+        uptimeMs: event.uptimeMs,
+        type: event.type,
+        thread: event.thread,
+        severity: event.severity,
+        attrs: event.attrs,
+      );
+
+      if (onSentryBreadcrumb != null) {
+        Future.sync(
+          () => onSentryBreadcrumb(
+            CircleBoxSentryAdapter.mapEvent(adapterEvent),
+          ),
+        );
+      }
+      if (onPostHogCapture != null) {
+        Future.sync(
+          () => onPostHogCapture(
+            CircleBoxPostHogAdapter.mapEvent(
+              adapterEvent,
+              eventName: postHogEventName,
+            ),
+          ),
+        );
+      }
+    });
   }
 }

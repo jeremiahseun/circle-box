@@ -23,13 +23,16 @@ final class CircleBoxRingBuffer<Element> {
         queue.sync { storedCount }
     }
 
-    func append(_ build: (Int64) -> Element) {
+    @discardableResult
+    func append(_ build: (Int64) -> Element) -> Element {
         queue.sync {
             let next = sequence
             sequence += 1
-            storage[writeIndex] = build(next)
+            let element = build(next)
+            storage[writeIndex] = element
             writeIndex = (writeIndex + 1) % storage.count
             storedCount = min(storedCount + 1, storage.count)
+            return element
         }
     }
 

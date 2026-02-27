@@ -1,5 +1,8 @@
 import SwiftUI
 import CircleBoxSDK
+#if canImport(CircleBoxCloud)
+import CircleBoxCloud
+#endif
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -41,6 +44,23 @@ struct ContentView: View {
                 Button("Export Logs") {
                     exportLogs()
                 }
+
+#if canImport(CircleBoxCloud)
+                Button("Upload to Cloud Now") {
+                    Task {
+                        do {
+                            let files = try await CircleBoxCloud.flush()
+                            activeAlert = .exportResult("Uploaded \(files.count) file(s) to cloud")
+                        } catch {
+                            activeAlert = .exportResult("Cloud upload failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
+#else
+                Button("Upload to Cloud Now") {
+                    activeAlert = .exportResult("CircleBoxCloud package not linked. Add the CircleBoxCloud product via Swift Package Manager to enable uploads.")
+                }
+#endif
 
                 Button("Open Local Viewer") {
                     viewerEvents = CircleBox.debugSnapshot(maxEvents: 200)
@@ -171,3 +191,4 @@ private enum ActiveAlert: Identifiable {
         }
     }
 }
+

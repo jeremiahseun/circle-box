@@ -49,6 +49,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Local dependency override
+        run: |
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
       - name: Pub get
         run: flutter pub get
       - name: Analyze
@@ -75,6 +82,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Local dependency override
+        run: |
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
       - name: Pub get
         run: flutter pub get
       - name: Analyze

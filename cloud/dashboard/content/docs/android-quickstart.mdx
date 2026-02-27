@@ -6,32 +6,93 @@ order: 3
 
 ## Install (GitHub Release AAR)
 
-Download AAR artifacts from the tagged release:
+CircleBox Android is distributed via release artifacts today.
+
+### 1) Download AARs from tagged release (`v0.3.1`)
 
 - `circlebox-sdk-release.aar`
 - `circlebox-cloud-release.aar` (optional)
 
-Add to your app module:
+### 2) Copy files into app module
+
+- `<your-app>/app/libs/circlebox-sdk-release.aar`
+- `<your-app>/app/libs/circlebox-cloud-release.aar` (optional)
+
+### 3) Add repository in `settings.gradle`
 
 ```gradle
-repositories {
-  flatDir {
-    dirs("$rootDir/libs")
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+    flatDir {
+      dirs("$rootDir/app/libs")
+    }
   }
 }
+```
 
+### 4) Add dependencies in `app/build.gradle`
+
+```gradle
 dependencies {
   implementation(name: "circlebox-sdk-release", ext: "aar")
   implementation(name: "circlebox-cloud-release", ext: "aar") // optional
 }
 ```
 
+### 5) Add cloud permissions (only if using cloud uploader)
+
+In `app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+```
+
+### 6) Verify dependency wiring
+
+```bash
+./gradlew :app:assembleDebug
+```
+
 Verify checksums against the release `checksums.txt`.
 
 ## Core Setup
 
+Initialize once at startup.
+
+### Recommended: custom `Application`
+
 ```kotlin
-CircleBox.start()
+import android.app.Application
+import com.circlebox.sdk.CircleBox
+
+class MyApp : Application() {
+  override fun onCreate() {
+    super.onCreate()
+    CircleBox.start()
+  }
+}
+```
+
+`AndroidManifest.xml`:
+
+```xml
+<application
+    android:name=".MyApp"
+    ... >
+</application>
+```
+
+### Fallback: first activity
+
+If you do not control `Application`, call `CircleBox.start()` in your launcher activity `onCreate`.
+
+Then use APIs anywhere in app code:
+
+```kotlin
 CircleBox.breadcrumb("checkout_started", mapOf("flow" to "standard"))
 ```
 
@@ -53,11 +114,20 @@ if (CircleBox.hasPendingCrashReport()) {
 
 ## Optional Cloud Upload
 
+Start cloud companion from the same startup location, right after `CircleBox.start()`:
+
 ```kotlin
 CircleBoxCloud.start(
   CircleBoxCloudConfig(
     endpoint = "https://circlebox.seunjeremiah.workers.dev",
-    ingestKey = "cb_live_<project_uuid>_us_<secret>"
+    ingestKey = "paste_ingest_key_from_control_plane",
+    flushIntervalSec = 15,
+    immediateFlushOnHighSignal = true,
   )
 )
 ```
+
+Key rules:
+
+- `ingestKey` must be `cb_live_*`
+- `usageBeaconKey` must be `cb_usage_*` when usage beacon is enabled

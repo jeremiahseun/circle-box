@@ -11,23 +11,42 @@ import 'package:path_provider/path_provider.dart';
 import 'circlebox_cloud_config.dart';
 
 class CircleBoxCloud {
+  static const String _sdkVersion = '0.3.1';
+  static const String _usageStateFileName = 'usage-beacon-state.json';
   static CircleBoxCloudConfig? _config;
   static bool _paused = false;
   static bool _isProcessingQueue = false;
+  static bool _isSendingUsageBeacon = false;
   static bool _queueLoaded = false;
+  static bool _usageStateLoaded = false;
   static bool _observerAttached = false;
   static bool _isForeground = true;
   static final List<_UploadTask> _uploadQueue = <_UploadTask>[];
   static File? _queueFile;
+  static File? _usageStateFile;
+  static _UsageBeaconState? _usageState;
   static Timer? _flushTimer;
   static final Random _random = Random();
   static final _CircleBoxCloudLifecycleObserver _lifecycleObserver = _CircleBoxCloudLifecycleObserver();
 
   static Future<void> start(CircleBoxCloudConfig config) async {
+    final ingestKey = config.ingestKey.trim();
+    if (!ingestKey.startsWith('cb_live_')) {
+      throw StateError('ingestKey must use cb_live_ prefix');
+    }
+    final usageKey = config.usageBeaconKey?.trim();
+    if (usageKey != null && usageKey.isNotEmpty && !usageKey.startsWith('cb_usage_')) {
+      throw StateError('usageBeaconKey must use cb_usage_ prefix');
+    }
+
     _config = config;
     _paused = false;
     await _resolveQueueFile();
     await _loadQueueIfNeeded();
+    await _resolveUsageStateFile();
+    await _loadUsageStateIfNeeded();
+    _recordUsageStart(config);
+    await _saveUsageState();
     _attachLifecycleObserverIfPossible();
     _configureAutoFlushTimer();
     await _handleForegroundDrain(checkPendingCrash: config.autoExportPendingOnStart);
@@ -88,12 +107,14 @@ class CircleBoxCloud {
       } catch (_) {
         // Keep auto-drain best-effort and non-throwing.
       }
+      await _sendUsageBeaconIfNeeded(force: false);
       return;
     }
 
     if (config.enableAutoFlush) {
       await _processQueue(config);
     }
+    await _sendUsageBeaconIfNeeded(force: false);
   }
 
   static void _attachLifecycleObserverIfPossible() {
@@ -173,6 +194,9 @@ class CircleBoxCloud {
         }
 
         final payload = await file.readAsBytes();
+        final summaryIncrement = task.endpointPath == 'v1/ingest/fragment'
+            ? _parseUsageSummaryIncrement(payload)
+            : null;
         final endpoint = config.endpoint.resolve(task.endpointPath);
         final outcome = await _uploadOnce(
           client: client,
@@ -186,12 +210,19 @@ class CircleBoxCloud {
         switch (outcome) {
           case _UploadOutcome.success:
             _removeTask(task.id);
+            if (summaryIncrement != null) {
+              _applyUsageSummaryIncrement(config, summaryIncrement);
+              await _saveUsageState();
+            }
           case _UploadOutcome.retryable:
             _rescheduleTask(task.id, config.retryMaxBackoffSec);
           case _UploadOutcome.permanent:
             _removeTask(task.id);
         }
         await _saveQueue();
+        if (outcome == _UploadOutcome.success && summaryIncrement != null) {
+          await _sendUsageBeaconIfNeeded(force: false);
+        }
       }
     } finally {
       _isProcessingQueue = false;
@@ -354,6 +385,17 @@ class CircleBoxCloud {
     _queueFile = File('${cloudDir.path}${Platform.pathSeparator}upload-queue.json');
   }
 
+  static Future<void> _resolveUsageStateFile() async {
+    if (_usageStateFile != null) {
+      return;
+    }
+    final queueFile = _queueFile;
+    if (queueFile == null) {
+      return;
+    }
+    _usageStateFile = File('${queueFile.parent.path}${Platform.pathSeparator}$_usageStateFileName');
+  }
+
   static Future<void> _loadQueueIfNeeded() async {
     if (_queueLoaded) {
       return;
@@ -396,6 +438,159 @@ class CircleBoxCloud {
     await queueFile.parent.create(recursive: true);
     final serialized = jsonEncode(_uploadQueue.map((task) => task.toJson()).toList(growable: false));
     await queueFile.writeAsString(serialized, flush: true);
+  }
+
+  static Future<void> _loadUsageStateIfNeeded() async {
+    if (_usageStateLoaded) {
+      return;
+    }
+    _usageStateLoaded = true;
+
+    final usageStateFile = _usageStateFile;
+    if (usageStateFile == null || !await usageStateFile.exists()) {
+      _usageState = _defaultUsageState();
+      return;
+    }
+
+    final content = await usageStateFile.readAsString();
+    if (content.trim().isEmpty) {
+      _usageState = _defaultUsageState();
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(content);
+      if (decoded is Map<String, dynamic>) {
+        _usageState = _normalizeUsageState(_UsageBeaconState.fromJson(decoded));
+      } else {
+        _usageState = _defaultUsageState();
+      }
+    } catch (_) {
+      _usageState = _defaultUsageState();
+    }
+  }
+
+  static Future<void> _saveUsageState() async {
+    final usageStateFile = _usageStateFile;
+    final usageState = _usageState;
+    if (usageStateFile == null || usageState == null) {
+      return;
+    }
+    await usageStateFile.parent.create(recursive: true);
+    await usageStateFile.writeAsString(jsonEncode(usageState.toJson()), flush: true);
+  }
+
+  static void _recordUsageStart(CircleBoxCloudConfig config) {
+    if (!config.enableUsageBeacon) {
+      return;
+    }
+    final current = _normalizeUsageState(_usageState ?? _defaultUsageState());
+    _usageState = current.copyWith(activeApps: current.activeApps + 1);
+  }
+
+  static void _applyUsageSummaryIncrement(CircleBoxCloudConfig config, _UsageSummaryIncrement increment) {
+    if (!config.enableUsageBeacon) {
+      return;
+    }
+    final current = _normalizeUsageState(_usageState ?? _defaultUsageState());
+    _usageState = current.copyWith(
+      crashReports: current.crashReports + increment.crashReports,
+      eventsEmitted: current.eventsEmitted + increment.eventsEmitted,
+    );
+  }
+
+  static _UsageSummaryIncrement? _parseUsageSummaryIncrement(List<int> payload) {
+    try {
+      final decoded = jsonDecode(utf8.decode(payload, allowMalformed: true));
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final totalEventsRaw = decoded['total_events'];
+      final crashEventRaw = decoded['crash_event_present'];
+      final totalEvents = totalEventsRaw is num ? max(0, totalEventsRaw.toInt()) : 0;
+      final crashReports = crashEventRaw == true ? 1 : 0;
+      return _UsageSummaryIncrement(
+        crashReports: crashReports,
+        eventsEmitted: totalEvents,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _sendUsageBeaconIfNeeded({required bool force}) async {
+    final config = _config;
+    if (
+        config == null ||
+        _isSendingUsageBeacon ||
+        !config.enableUsageBeacon ||
+        (config.usageBeaconKey?.trim().isEmpty ?? true)
+    ) {
+      return;
+    }
+
+    final usageState = _normalizeUsageState(_usageState ?? _defaultUsageState());
+    _usageState = usageState;
+    final nowMs = _nowMs();
+    final minIntervalMs = max(30, config.usageBeaconMinIntervalSec) * 1000;
+    if (!force && (nowMs - usageState.lastSentUnixMs) < minIntervalMs) {
+      return;
+    }
+
+    _isSendingUsageBeacon = true;
+    final client = HttpClient();
+    var success = false;
+    try {
+      final endpoint = (config.usageBeaconEndpoint ?? config.endpoint).resolve('v1/telemetry/usage');
+      final request = await client.postUrl(endpoint);
+      request.headers.set('x-circlebox-usage-key', config.usageBeaconKey!.trim());
+      request.headers.set('content-type', 'application/json');
+      request.write(
+        jsonEncode(<String, Object>{
+          'sdk_family': 'flutter',
+          'sdk_version': _sdkVersion,
+          'mode': config.usageBeaconMode.wireValue,
+          'usage_date': usageState.usageDate,
+          'active_apps': usageState.activeApps,
+          'crash_reports': usageState.crashReports,
+          'events_emitted': usageState.eventsEmitted,
+        }),
+      );
+      final response = await request.close();
+      success = response.statusCode >= 200 && response.statusCode <= 299;
+    } catch (_) {
+      success = false;
+    } finally {
+      _isSendingUsageBeacon = false;
+      client.close(force: true);
+    }
+
+    if (success) {
+      _usageState = usageState.copyWith(lastSentUnixMs: _nowMs());
+      await _saveUsageState();
+    }
+  }
+
+  static _UsageBeaconState _defaultUsageState() {
+    return _UsageBeaconState(
+      usageDate: _currentUsageDate(),
+      activeApps: 0,
+      crashReports: 0,
+      eventsEmitted: 0,
+      lastSentUnixMs: 0,
+    );
+  }
+
+  static _UsageBeaconState _normalizeUsageState(_UsageBeaconState state) {
+    final today = _currentUsageDate();
+    if (state.usageDate == today) {
+      return state;
+    }
+    return _defaultUsageState();
+  }
+
+  static String _currentUsageDate() {
+    return DateTime.now().toUtc().toIso8601String().split('T').first;
   }
 }
 
@@ -479,4 +674,65 @@ class _UploadTask {
       nextAttemptUnixMs: nextAttemptUnixMs ?? this.nextAttemptUnixMs,
     );
   }
+}
+
+class _UsageBeaconState {
+  const _UsageBeaconState({
+    required this.usageDate,
+    required this.activeApps,
+    required this.crashReports,
+    required this.eventsEmitted,
+    required this.lastSentUnixMs,
+  });
+
+  final String usageDate;
+  final int activeApps;
+  final int crashReports;
+  final int eventsEmitted;
+  final int lastSentUnixMs;
+
+  factory _UsageBeaconState.fromJson(Map<String, dynamic> json) {
+    return _UsageBeaconState(
+      usageDate: json['usage_date'] as String? ?? '',
+      activeApps: (json['active_apps'] as num?)?.toInt() ?? 0,
+      crashReports: (json['crash_reports'] as num?)?.toInt() ?? 0,
+      eventsEmitted: (json['events_emitted'] as num?)?.toInt() ?? 0,
+      lastSentUnixMs: (json['last_sent_unix_ms'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, Object> toJson() {
+    return <String, Object>{
+      'usage_date': usageDate,
+      'active_apps': activeApps,
+      'crash_reports': crashReports,
+      'events_emitted': eventsEmitted,
+      'last_sent_unix_ms': lastSentUnixMs,
+    };
+  }
+
+  _UsageBeaconState copyWith({
+    int? activeApps,
+    int? crashReports,
+    int? eventsEmitted,
+    int? lastSentUnixMs,
+  }) {
+    return _UsageBeaconState(
+      usageDate: usageDate,
+      activeApps: activeApps ?? this.activeApps,
+      crashReports: crashReports ?? this.crashReports,
+      eventsEmitted: eventsEmitted ?? this.eventsEmitted,
+      lastSentUnixMs: lastSentUnixMs ?? this.lastSentUnixMs,
+    );
+  }
+}
+
+class _UsageSummaryIncrement {
+  const _UsageSummaryIncrement({
+    required this.crashReports,
+    required this.eventsEmitted,
+  });
+
+  final int crashReports;
+  final int eventsEmitted;
 }

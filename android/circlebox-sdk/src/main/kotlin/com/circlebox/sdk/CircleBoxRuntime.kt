@@ -3,6 +3,9 @@ package com.circlebox.sdk
 import android.content.Context
 import android.os.Looper
 import android.os.SystemClock
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 internal class CircleBoxRuntime(
     context: Context
@@ -16,6 +19,10 @@ internal class CircleBoxRuntime(
     private var fileStore = CircleBoxFileStore(appContext)
     private var collectors: CircleBoxSignalCollectors? = null
     private var crashHandler: CircleBoxCrashHandler? = null
+    private val eventListeners = ConcurrentHashMap<String, CircleBoxEventListener>()
+    private val listenerExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "circlebox-event-listeners").apply { isDaemon = true }
+    }
     private var started = false
 
     fun start(config: CircleBoxConfig) {
@@ -120,6 +127,16 @@ internal class CircleBoxRuntime(
         return events.takeLast(clamped)
     }
 
+    fun addEventListener(listener: CircleBoxEventListener): String {
+        val token = UUID.randomUUID().toString()
+        eventListeners[token] = listener
+        return token
+    }
+
+    fun removeEventListener(token: String) {
+        eventListeners.remove(token)
+    }
+
     private fun handleCrash(thread: Thread, throwable: Throwable) {
         record(
             type = "native_exception_prehook",
@@ -188,7 +205,7 @@ internal class CircleBoxRuntime(
         val localConfig = synchronized(lock) { config }
         val sanitized = CircleBoxSanitizer.sanitize(attrs, localConfig)
 
-        ringBuffer.append { seq ->
+        val event = ringBuffer.append { seq ->
             CircleBoxEvent(
                 seq = seq,
                 timestampUnixMs = nowMs(),
@@ -199,9 +216,21 @@ internal class CircleBoxRuntime(
                 attrs = sanitized
             )
         }
+        notifyEventListeners(event)
 
         if (persistCheckpoint) {
             writeCheckpointBestEffort()
+        }
+    }
+
+    private fun notifyEventListeners(event: CircleBoxEvent) {
+        if (eventListeners.isEmpty()) {
+            return
+        }
+        listenerExecutor.execute {
+            eventListeners.values.forEach { listener ->
+                runCatching { listener.onEvent(event) }
+            }
         }
     }
 

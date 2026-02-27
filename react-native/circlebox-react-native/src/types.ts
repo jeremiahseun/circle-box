@@ -27,3 +27,14 @@ export interface CircleBoxErrorHookConfig {
   captureJsExceptions?: boolean;
   captureUnhandledRejections?: boolean;
 }
+
+export interface CircleBoxRealtimeOptions {
+  forwardAll?: boolean;
+  includeEventTypes?: string[];
+  pollIntervalMs?: number;
+  maxEvents?: number;
+}
+
+export interface CircleBoxSubscription {
+  remove(): void;
+}

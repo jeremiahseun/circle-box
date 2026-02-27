@@ -16,5 +16,10 @@ final class CircleBoxCloudTests: XCTestCase {
         XCTAssertEqual(config.retryMaxBackoffSec, 30)
         XCTAssertTrue(config.enableAutoFlush)
         XCTAssertTrue(config.autoExportPendingOnStart)
+        XCTAssertTrue(config.immediateFlushOnHighSignal)
+        XCTAssertFalse(config.enableUsageBeacon)
+        XCTAssertNil(config.usageBeaconKey)
+        XCTAssertEqual(config.usageBeaconMode, .coreCloud)
+        XCTAssertEqual(config.usageBeaconMinIntervalSec, 300)
     }
 }

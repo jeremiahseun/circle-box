@@ -5,6 +5,9 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.circlebox.cloud.CircleBoxCloud
+import com.circlebox.cloud.CircleBoxCloudConfig
+import com.circlebox.cloud.CircleBoxCloudUsageMode
 import com.circlebox.sdk.CircleBox
 import com.circlebox.sdk.CircleBoxConfig
 import com.circlebox.sdk.CircleBoxEvent
@@ -15,6 +18,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         CircleBox.start(CircleBoxConfig(enableDebugViewer = true))
+        startCloudIfConfigured()
 
         findViewById<Button>(R.id.btnThermal).setOnClickListener {
             CircleBox.breadcrumb("Mock thermal spike", mapOf("state" to "critical"))
@@ -43,6 +47,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnExport).setOnClickListener {
             val files = CircleBox.exportLogs()
             Toast.makeText(this, "Exported ${files.size} file(s)", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btnCloudFlush).setOnClickListener {
+            try {
+                val files = CircleBoxCloud.flush()
+                Toast.makeText(this, "Uploaded ${files.size} file(s) to cloud", Toast.LENGTH_SHORT).show()
+            } catch (error: IllegalStateException) {
+                Toast.makeText(this, "Cloud flush failed: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
         }
 
         findViewById<Button>(R.id.btnViewer).setOnClickListener {
@@ -159,5 +172,34 @@ class MainActivity : AppCompatActivity() {
                 openViewerDialog()
             }
             .show()
+    }
+
+    private fun startCloudIfConfigured() {
+        val endpoint = BuildConfig.CIRCLEBOX_WORKER_BASE_URL.trim()
+        val ingestKey = BuildConfig.CIRCLEBOX_INGEST_KEY.trim()
+        if (endpoint.isEmpty() || ingestKey.isEmpty()) {
+            return
+        }
+
+        val usageKey = BuildConfig.CIRCLEBOX_USAGE_KEY.trim().takeIf { it.isNotEmpty() }
+        try {
+            CircleBoxCloud.start(
+                CircleBoxCloudConfig(
+                    endpoint = endpoint,
+                    ingestKey = ingestKey,
+                    enableAutoFlush = true,
+                    autoExportPendingOnStart = true,
+                    enableUsageBeacon = usageKey != null,
+                    usageBeaconKey = usageKey,
+                    usageBeaconMode = CircleBoxCloudUsageMode.CORE_CLOUD
+                )
+            )
+            CircleBox.breadcrumb("cloud_uploader_enabled", mapOf("mode" to "core_cloud"))
+        } catch (error: IllegalArgumentException) {
+            CircleBox.breadcrumb(
+                "cloud_uploader_start_failed",
+                mapOf("error" to (error.message ?: "invalid_config"))
+            )
+        }
     }
 }

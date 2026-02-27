@@ -20,6 +20,27 @@ npm run ios
 npm run android
 ```
 
+If bundling reports `Unable to resolve "circlebox-react-native"`, clear Metro cache and restart:
+
+```bash
+cd samples/react-native-chaos-app
+npx expo start --clear
+```
+
+If iOS `pod install` fails with:
+
+- `Unable to find a specification for ReactAppDependencyProvider depended upon by Expo`
+
+your app is likely using an incompatible React Native version for Expo SDK 53.
+Use the versions in this sample (`react 19.0.0`, `react-native 0.79.6`), then regenerate native folders:
+
+```bash
+cd samples/react-native-chaos-app
+rm -rf ios android node_modules package-lock.json
+npm install
+npx expo prebuild --clean
+```
+
 ## Manual Flow
 
 1. Tap mock actions and breadcrumb action.

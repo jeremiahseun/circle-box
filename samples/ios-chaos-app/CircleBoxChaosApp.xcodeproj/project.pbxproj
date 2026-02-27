@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		08A245ABF60447D61B5D3504 /* CircleBoxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D228849A4B533801A687646 /* CircleBoxApp.swift */; };
 		33DF759215B027185215959A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13CE4681EB474FB132BE9073 /* ContentView.swift */; };
+		3E5DA039CD7E42611F483A98 /* CircleBoxCloud in Frameworks */ = {isa = PBXBuildFile; productRef = 3215EFCF322A9BE5744EA566 /* CircleBoxCloud */; };
 		5E3DC90893987B028C30E30A /* CircleBoxSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 0D0B6BF26D7E86C70F29F8AD /* CircleBoxSDK */; };
 		FB81F9003A3F2A2892E45D79 /* ChaosViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC1C7E69C57487A92F4DF51 /* ChaosViewController.swift */; };
 /* End PBXBuildFile section */
@@ -19,6 +20,7 @@
 		9D228849A4B533801A687646 /* CircleBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleBoxApp.swift; sourceTree = "<group>"; };
 		9FC1C7E69C57487A92F4DF51 /* ChaosViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaosViewController.swift; sourceTree = "<group>"; };
 		EF3791BF3ED7880D4CFF2FB9 /* CircleBoxSDK */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CircleBoxSDK; path = ../../ios/CircleBoxSDK; sourceTree = SOURCE_ROOT; };
+		F471C3ECF5DF575AFCAC2307 /* CircleBoxCloud */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CircleBoxCloud; path = ../../ios/CircleBoxCloud; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -27,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E3DC90893987B028C30E30A /* CircleBoxSDK in Frameworks */,
+				3E5DA039CD7E42611F483A98 /* CircleBoxCloud in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,6 +56,7 @@
 		BCA39682A4E9D2FF13C38A21 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				F471C3ECF5DF575AFCAC2307 /* CircleBoxCloud */,
 				EF3791BF3ED7880D4CFF2FB9 /* CircleBoxSDK */,
 			);
 			name = Packages;
@@ -86,6 +90,7 @@
 			name = CircleBoxChaosApp;
 			packageProductDependencies = (
 				0D0B6BF26D7E86C70F29F8AD /* CircleBoxSDK */,
+				3215EFCF322A9BE5744EA566 /* CircleBoxCloud */,
 			);
 			productName = CircleBoxChaosApp;
 			productReference = 9848F7EC9CBA866DC7471B7B /* CircleBoxChaosApp.app */;
@@ -111,6 +116,7 @@
 			mainGroup = 2A46C2C59AA29A4FB8A2541B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				515926CA93D795C05CED6E20 /* XCLocalSwiftPackageReference "../../ios/CircleBoxCloud" */,
 				434CA3F2393893A4F0878943 /* XCLocalSwiftPackageReference "../../ios/CircleBoxSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -319,12 +325,20 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../ios/CircleBoxSDK;
 		};
+		515926CA93D795C05CED6E20 /* XCLocalSwiftPackageReference "../../ios/CircleBoxCloud" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../ios/CircleBoxCloud;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		0D0B6BF26D7E86C70F29F8AD /* CircleBoxSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CircleBoxSDK;
+		};
+		3215EFCF322A9BE5744EA566 /* CircleBoxCloud */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CircleBoxCloud;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -5,6 +5,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "preserveSymlinks": true,
     "moduleResolution": "node",
     "types": ["react", "react-native"],
     "lib": ["es2020"]

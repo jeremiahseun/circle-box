@@ -62,4 +62,13 @@ class CircleBoxRingBufferTest {
         assertEquals(50, snapshot.size)
         assertTrue(snapshot.zipWithNext().all { (a, b) -> b > a })
     }
+
+    @Test
+    fun appendReturnsInsertedValue() {
+        val buffer = CircleBoxRingBuffer<Long>(5)
+        val inserted = buffer.append { it * 10 }
+
+        assertEquals(0L, inserted)
+        assertEquals(listOf(0L), buffer.snapshot())
+    }
 }

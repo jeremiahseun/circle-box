@@ -91,10 +91,12 @@ On uncaught crash paths:
 - `docs/schema-v2.md` - canonical schema reference
 - `docs/integrations.md` - adapter and forwarding integration guide
 - `docs/phase1-closeout.md` - Phase 1 acceptance and sign-off checklist
+- `docs/cloud-cli.md` - CLI usage for control-plane project/key management
 - `scripts/check_naming.sh` - naming guard script
 - `scripts/check_release_versions.sh` - release version alignment guard
 - `scripts/check_schema_parity.py` - fixture parity contract checker
 - `scripts/decode_persistence.py` - pending/checkpoint decoder utility
+- `scripts/cli/circlebox.sh` - control-plane CLI
 - `.github/workflows` - CI workflows
 
 ## Platform Support
@@ -115,9 +117,30 @@ CircleBox release mode is **git-tag + release artifacts**:
 
 See `cloud/dashboard/content/docs/release-matrix.mdx` for full install matrix.
 
+## Product Modes
+
+CircleBox supports three production operating modes:
+
+1. Offline only (no network, no keys)
+2. Core + CircleBox cloud (managed ingest + dashboard)
+3. Core + self-host backend (optional aggregate usage beacon)
+
+Control-plane onboarding:
+
+- UI: `/signup`, `/app/onboarding`, `/app/projects/<project_id>/keys`
+- CLI: `scripts/cli/circlebox.sh` (see `docs/cloud-cli.md`)
+
 ## Quick Start
 
 ### iOS (Swift Package)
+
+Add one package dependency (root URL):
+
+```swift
+.package(url: "https://github.com/jeremiahseun/circle-box.git", from: "0.3.1")
+```
+
+Select `CircleBoxSDK` (and optionally `CircleBoxCloud`, `CircleBoxIntegrations`) from that single package reference.
 
 Add `CircleBoxSDK` to your app, then call:
 
@@ -282,6 +305,10 @@ Worker-first cloud deployment helpers:
 - `scripts/deploy_phase3_cloud.sh`
 - `scripts/release_check.sh`
 
+Release runbook:
+- `docs/release/deploy-today.md`
+- `docs/usage-beacon-validation.md`
+
 Manual flow:
 
 1. Trigger multiple mock chaos events
@@ -301,7 +328,7 @@ bash scripts/check_naming.sh
 ### Release Version Guard
 
 ```bash
-bash scripts/check_release_versions.sh 0.3.0
+bash scripts/check_release_versions.sh 0.3.1
 ```
 
 ### iOS Tests
@@ -348,6 +375,10 @@ python3 scripts/check_schema_parity.py
 ```bash
 bash scripts/release_check.sh
 ```
+
+Public registry publish runbook:
+
+- `docs/release/public-registries.md`
 
 Optional smoke flags for release check:
 

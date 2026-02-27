@@ -12,6 +12,12 @@ permissions:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    env:
+      CIRCLEBOX_WORKER_BASE_URL: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}
+      CIRCLEBOX_SMOKE_INGEST_KEY: ${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}
+      CONTROL_SUPABASE_URL: ${{ secrets.CONTROL_SUPABASE_URL }}
+      CONTROL_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}
+      DASHBOARD_WORKER_TOKEN: ${{ secrets.DASHBOARD_WORKER_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,11 +26,25 @@ jobs:
       - name: Naming guard
         run: scripts/check_naming.sh
       - name: Release version map
-        run: scripts/check_release_versions.sh 0.3.0
+        run: scripts/check_release_versions.sh 0.3.1
       - name: Schema parity fixtures
         run: scripts/check_schema_parity.py
+      - name: CLI syntax check
+        run: bash -n scripts/cli/circlebox.sh
       - name: Dashboard docs/type checks
         working-directory: cloud/dashboard
+        env:
+          DASHBOARD_DEFAULT_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+          DASHBOARD_DEFAULT_REGION: us
+          DASHBOARD_US_SUPABASE_URL: https://example-us.supabase.co
+          DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY: test-us-service-role
+          DASHBOARD_EU_SUPABASE_URL: https://example-eu.supabase.co
+          DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY: test-eu-service-role
+          DASHBOARD_WORKER_BASE_URL: https://example.workers.dev
+          DASHBOARD_WORKER_TOKEN: test-dashboard-worker-token
+          DASHBOARD_CONTROL_SUPABASE_URL: https://example-control.supabase.co
+          DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY: test-control-service-role
+          DASHBOARD_APP_SESSION_SECRET: test-dashboard-session-secret
         run: |
           npm install
           npm run typecheck
@@ -36,12 +56,20 @@ jobs:
           npm install
           npm run typecheck
       - name: Worker ingest smoke (optional when secrets are set)
-        if: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL != '' && secrets.CIRCLEBOX_SMOKE_INGEST_KEY != '' }}
+        if: ${{ env.CIRCLEBOX_WORKER_BASE_URL != '' && env.CIRCLEBOX_SMOKE_INGEST_KEY != '' }}
         run: |
           scripts/smoke_test_worker_ingest.sh \
-            --base-url "${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}" \
-            --ingest-key "${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
-            --dashboard-token "${{ secrets.DASHBOARD_WORKER_TOKEN }}"
+            --base-url "${{ env.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ env.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --dashboard-token "${{ env.DASHBOARD_WORKER_TOKEN }}"
+      - name: Worker usage/key-auth smoke (optional when control-plane secrets are set)
+        if: ${{ env.CIRCLEBOX_WORKER_BASE_URL != '' && env.CIRCLEBOX_SMOKE_INGEST_KEY != '' && env.CONTROL_SUPABASE_URL != '' && env.CONTROL_SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_usage_telemetry.sh \
+            --base-url "${{ env.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ env.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --control-url "${{ env.CONTROL_SUPABASE_URL }}" \
+            --control-service-role "${{ env.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}"
 
   ios-assets:
     runs-on: macos-latest
@@ -87,7 +115,7 @@ jobs:
       - name: Build Android Cloud AAR
         working-directory: android/circlebox-cloud
         run: |
-          ../circlebox-sdk/gradlew --no-daemon -p . test assembleRelease
+          ./gradlew --no-daemon test assembleRelease
       - name: Collect Android artifacts
         run: |
           mkdir -p artifacts
@@ -114,12 +142,25 @@ jobs:
           flutter analyze
           flutter test
           cd ../circlebox_cloud_flutter
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
           flutter pub get
           flutter analyze
           flutter test
+          rm -f pubspec_overrides.yaml
           cd ../circlebox_adapters
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
           flutter pub get
-          dart test
+          flutter analyze
+          flutter test
+          rm -f pubspec_overrides.yaml
       - name: Package Flutter artifacts
         run: |
           mkdir -p artifacts
@@ -143,14 +184,16 @@ jobs:
       - name: Pack RN core package
         working-directory: react-native/circlebox-react-native
         run: |
-          npm install
+          npm ci --include=dev
           npm run typecheck
+          mkdir -p ../../artifacts
           npm pack --pack-destination ../../artifacts
       - name: Pack RN cloud package
         working-directory: react-native/circlebox-cloud-react-native
         run: |
-          npm install
+          npm ci --include=dev
           npm run typecheck
+          mkdir -p ../../artifacts
           npm pack --pack-destination ../../artifacts
       - name: Upload RN assets
         uses: actions/upload-artifact@v4

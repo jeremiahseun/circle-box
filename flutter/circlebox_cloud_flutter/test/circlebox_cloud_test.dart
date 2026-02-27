@@ -10,7 +10,13 @@ void main() {
 
     expect(config.region, 'auto');
     expect(config.enableFragmentSync, isTrue);
+    expect(config.flushIntervalSec, 15);
     expect(config.enableAutoFlush, isTrue);
     expect(config.autoExportPendingOnStart, isTrue);
+    expect(config.immediateFlushOnHighSignal, isTrue);
+    expect(config.enableUsageBeacon, isFalse);
+    expect(config.usageBeaconKey, isNull);
+    expect(config.usageBeaconMode, CircleBoxCloudUsageMode.coreCloud);
+    expect(config.usageBeaconMinIntervalSec, 300);
   });
 }

@@ -7,6 +7,7 @@ INGEST_KEY=""
 REGION="us"
 SKIP_SCHEMA_CHECK=0
 SKIP_SMOKE=0
+SKIP_USAGE_SMOKE=0
 SKIP_SECRETS=0
 SKIP_TYPECHECK=0
 DRY_RUN=0
@@ -28,6 +29,7 @@ Options:
   --region REGION         us|eu for smoke test metadata (default: us)
   --skip-schema-check     Skip schema table checks
   --skip-smoke            Skip smoke test
+  --skip-usage-smoke      Skip usage telemetry/key-lifecycle smoke test
   --skip-secrets          Skip pushing worker secrets during deploy
   --skip-typecheck        Skip worker typecheck during deploy
   --dry-run               Print deploy command without executing
@@ -55,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-smoke)
       SKIP_SMOKE=1
+      shift
+      ;;
+    --skip-usage-smoke)
+      SKIP_USAGE_SMOKE=1
       shift
       ;;
     --skip-secrets)
@@ -104,6 +110,14 @@ if [[ "$SKIP_SMOKE" -eq 0 ]]; then
     smoke_args+=(--ingest-key "$INGEST_KEY")
   fi
   "${ROOT_DIR}/scripts/smoke_test_worker_ingest.sh" "${smoke_args[@]}"
+fi
+
+if [[ "$SKIP_USAGE_SMOKE" -eq 0 ]]; then
+  usage_smoke_args=(--env-file "$ENV_FILE" --region "$REGION")
+  if [[ -n "$INGEST_KEY" ]]; then
+    usage_smoke_args+=(--ingest-key "$INGEST_KEY")
+  fi
+  "${ROOT_DIR}/scripts/smoke_test_worker_usage_telemetry.sh" "${usage_smoke_args[@]}"
 fi
 
 echo "[deploy_phase3_cloud] Completed."

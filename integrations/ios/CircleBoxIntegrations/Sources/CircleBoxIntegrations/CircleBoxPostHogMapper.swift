@@ -18,7 +18,10 @@ public enum CircleBoxPostHogMapper {
             "platform": envelope.platform,
             "export_source": envelope.exportSource,
             "capture_reason": envelope.captureReason,
-            "total_events": String(envelope.events.count)
+            "total_events": String(envelope.events.count),
+            "circlebox_source": "circlebox",
+            "circlebox_mode": "export_adapter",
+            "circlebox_sdk": "ios"
         ]
         if let last = envelope.events.last {
             properties["last_event_type"] = last.type
@@ -30,7 +33,37 @@ public enum CircleBoxPostHogMapper {
         return CircleBoxPostHogEvent(event: name, properties: properties)
     }
 
+    public static func event(
+        from event: CircleBoxAdapterEvent,
+        name: String = "circlebox_realtime_event",
+        sdk: String = "ios"
+    ) -> CircleBoxPostHogEvent {
+        CircleBoxPostHogEvent(
+            event: name,
+            properties: [
+                "seq": String(event.seq),
+                "timestamp_unix_ms": String(event.timestampUnixMs),
+                "uptime_ms": String(event.uptimeMs),
+                "type": event.type,
+                "thread": event.thread,
+                "severity": event.severity,
+                "attrs_json": compactJSONStringMap(event.attrs),
+                "circlebox_source": "circlebox",
+                "circlebox_mode": "realtime_adapter",
+                "circlebox_sdk": sdk
+            ]
+        )
+    }
+
     private static func compactJSON(_ object: [String: Int]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return text
+    }
+
+    private static func compactJSONStringMap(_ object: [String: String]) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
               let text = String(data: data, encoding: .utf8) else {
             return "{}"

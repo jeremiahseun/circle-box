@@ -16,6 +16,7 @@ android/.gradle/
 .pub/
 flutter/circlebox_flutter/pubspec.lock
 **/node_modules/
+**/.expo/
 
 # Local environment and secrets
 .env
@@ -33,3 +34,4 @@ artifacts/
 
 # Wrangler
 .wrangler/
+.vercel

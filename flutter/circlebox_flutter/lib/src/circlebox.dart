@@ -18,6 +18,10 @@ class CircleBox {
   static FlutterExceptionHandler? _previousFlutterErrorHandler;
   static ErrorCallback? _previousPlatformDispatcherOnError;
   static RawReceivePort? _isolateErrorPort;
+  static StreamController<CircleBoxDebugEvent>? _realtimeController;
+  static Timer? _realtimePollTimer;
+  static int _realtimeLastSeq = -1;
+  static int _realtimeMaxEvents = 200;
 
   /// Starts the native SDK with [config].
   ///
@@ -58,6 +62,60 @@ class CircleBox {
   static Future<List<CircleBoxDebugEvent>> debugSnapshot({int maxEvents = 200}) async {
     final raw = await CircleBoxFlutterPlatform.instance.debugSnapshot(maxEvents: maxEvents);
     return raw.map(CircleBoxDebugEvent.fromMap).toList(growable: false);
+  }
+
+  /// Returns a realtime event stream sourced from native CircleBox snapshots.
+  ///
+  /// This stream is best-effort and designed for adapter forwarding flows.
+  static Stream<CircleBoxDebugEvent> eventStream({
+    CircleBoxRealtimeFilter filter = const CircleBoxRealtimeFilter(),
+    Duration pollInterval = const Duration(milliseconds: 500),
+    int maxEvents = 200,
+  }) {
+    _realtimeMaxEvents = maxEvents < 1 ? 1 : maxEvents;
+    _ensureRealtimeController(pollInterval);
+    return _realtimeController!.stream.where(filter.matches);
+  }
+
+  static void _ensureRealtimeController(Duration pollInterval) {
+    if (_realtimeController != null) {
+      return;
+    }
+
+    _realtimeController = StreamController<CircleBoxDebugEvent>.broadcast(
+      onListen: () {
+        _realtimePollTimer ??= Timer.periodic(pollInterval, (_) {
+          unawaited(_pollRealtimeEvents());
+        });
+        unawaited(_pollRealtimeEvents());
+      },
+      onCancel: () {
+        if (!(_realtimeController?.hasListener ?? false)) {
+          _realtimePollTimer?.cancel();
+          _realtimePollTimer = null;
+        }
+      },
+    );
+  }
+
+  static Future<void> _pollRealtimeEvents() async {
+    final controller = _realtimeController;
+    if (controller == null) {
+      return;
+    }
+
+    try {
+      final snapshot = await debugSnapshot(maxEvents: _realtimeMaxEvents);
+      for (final event in snapshot) {
+        if (event.seq <= _realtimeLastSeq) {
+          continue;
+        }
+        _realtimeLastSeq = event.seq;
+        controller.add(event);
+      }
+    } catch (_) {
+      // Realtime polling is best-effort and must not throw into host app.
+    }
   }
 
   static void _installFlutterErrorHooks() {
@@ -153,6 +211,30 @@ class CircleBox {
     } catch (_) {
       // Global error hooks must not throw into host app code paths.
     }
+  }
+}
+
+class CircleBoxRealtimeFilter {
+  const CircleBoxRealtimeFilter({
+    this.forwardAll = false,
+    this.includeEventTypes = const <String>{},
+  });
+
+  final bool forwardAll;
+  final Set<String> includeEventTypes;
+
+  bool matches(CircleBoxDebugEvent event) {
+    if (includeEventTypes.isNotEmpty && !includeEventTypes.contains(event.type)) {
+      return false;
+    }
+    if (forwardAll) {
+      return true;
+    }
+
+    if (event.type == 'breadcrumb' || event.type == 'native_exception_prehook') {
+      return true;
+    }
+    return event.severity == 'warn' || event.severity == 'error' || event.severity == 'fatal';
   }
 }
 

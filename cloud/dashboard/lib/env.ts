@@ -3,7 +3,7 @@ export type DashboardRegion = "us" | "eu";
 export type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
 export type DashboardRuntimeConfig = {
-  defaultProjectId: string;
+  defaultProjectId: string | null;
   defaultRegion: DashboardRegion;
   workerBaseUrl: string;
   workerToken: string;
@@ -14,7 +14,7 @@ export type DashboardRuntimeConfig = {
 };
 
 type DashboardScope = {
-  projectId: string;
+  projectId: string | null;
   region: DashboardRegion;
 };
 
@@ -27,7 +27,7 @@ export function getDashboardRuntimeConfig(): DashboardRuntimeConfig {
 
   const defaultRegion = parseRegion(readRequiredEnv("DASHBOARD_DEFAULT_REGION"), "DASHBOARD_DEFAULT_REGION");
   cachedConfig = {
-    defaultProjectId: readRequiredEnv("DASHBOARD_DEFAULT_PROJECT_ID"),
+    defaultProjectId: readOptionalEnv("DASHBOARD_DEFAULT_PROJECT_ID"),
     defaultRegion,
     workerBaseUrl: trimTrailingSlash(readRequiredEnv("DASHBOARD_WORKER_BASE_URL")),
     workerToken: readRequiredEnv("DASHBOARD_WORKER_TOKEN"),
@@ -67,6 +67,11 @@ function readRequiredEnv(key: string): string {
     throw new Error(`Missing required env var: ${key}`);
   }
   return value;
+}
+
+function readOptionalEnv(key: string): string | null {
+  const value = process.env[key]?.trim();
+  return value && value.length > 0 ? value : null;
 }
 
 function parseRegion(input: string, source: string): DashboardRegion {

@@ -10,14 +10,18 @@ order: 6
 - Cloudflare R2 bucket (`cb-reports-raw`)
 - Supabase US project (data plane)
 - Supabase EU project (data plane)
+- Supabase control-plane project (keys, projects, usage)
 
 ## Configure Worker Secrets
 
 ```bash
 wrangler secret put US_SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put EU_SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put CONTROL_SUPABASE_SERVICE_ROLE_KEY
 wrangler secret put DASHBOARD_WORKER_TOKEN
 wrangler secret put DASHBOARD_SHARED_SECRET
+# Optional synthetic alert webhook
+wrangler secret put SYNTHETIC_ALERT_WEBHOOK_URL
 ```
 
 ## Deploy Worker
@@ -31,14 +35,14 @@ npm run deploy
 Or from repo root:
 
 ```bash
-scripts/deploy_phase3_cloud.sh --ingest-key "cb_live_<project_uuid>_us_<secret>"
+scripts/deploy_phase3_cloud.sh --ingest-key "<ingest_key_from_/app/projects/.../keys>"
 ```
 
 ## Dashboard Env
 
 Set these in `cloud/dashboard/.env.local`:
 
-- `DASHBOARD_DEFAULT_PROJECT_ID`
+- `DASHBOARD_DEFAULT_PROJECT_ID` (optional)
 - `DASHBOARD_DEFAULT_REGION`
 - `DASHBOARD_US_SUPABASE_URL`
 - `DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY`
@@ -46,6 +50,31 @@ Set these in `cloud/dashboard/.env.local`:
 - `DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY`
 - `DASHBOARD_WORKER_BASE_URL`
 - `DASHBOARD_WORKER_TOKEN`
+- `DASHBOARD_PUBLIC_BASE_URL`
+- `DASHBOARD_CONTROL_SUPABASE_URL`
+- `DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY`
+- `DASHBOARD_APP_SESSION_SECRET`
+
+## Control Plane Onboarding
+
+1. Open `/signup` and create your account.
+2. On `/app/onboarding`, choose:
+   - Create New Project
+   - Join Existing Project (invite token)
+3. Copy generated `ingest` key from `/app/projects/<project_id>/keys`.
+4. Configure SDK cloud uploader with worker endpoint + ingest key.
+5. Open `/app/projects/<project_id>/keys` to rotate/revoke/create additional keys.
+6. Owners create token invites from `/app/projects/<project_id>/invites`; teammates accept on `/app/invites/accept`.
+
+## CLI Alternative
+
+You can manage projects and keys without UI:
+
+```bash
+scripts/cli/circlebox.sh auth login --control-url "<url>" --service-role "<key>"
+scripts/cli/circlebox.sh project create --organization-id "<org_id>" --name "My App" --region us
+scripts/cli/circlebox.sh key create --project-id "<project_id>" --type ingest
+```
 
 ## Validate End-to-End
 

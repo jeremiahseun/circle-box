@@ -46,9 +46,9 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v3
       - name: Unit tests
-        run: ../circlebox-sdk/gradlew --no-daemon -p . test
+        run: ./gradlew --no-daemon test
       - name: Assemble cloud AAR
-        run: ../circlebox-sdk/gradlew --no-daemon -p . assembleRelease
+        run: ./gradlew --no-daemon assembleRelease
       - name: Upload cloud AAR
         uses: actions/upload-artifact@v4
         with:

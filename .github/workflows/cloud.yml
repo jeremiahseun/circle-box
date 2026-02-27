@@ -21,6 +21,12 @@ on:
 jobs:
   cloud-types:
     runs-on: ubuntu-latest
+    env:
+      CIRCLEBOX_WORKER_BASE_URL: ${{ secrets.CIRCLEBOX_WORKER_BASE_URL }}
+      CIRCLEBOX_SMOKE_INGEST_KEY: ${{ secrets.CIRCLEBOX_SMOKE_INGEST_KEY }}
+      CONTROL_SUPABASE_URL: ${{ secrets.CONTROL_SUPABASE_URL }}
+      CONTROL_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}
+      DASHBOARD_WORKER_TOKEN: ${{ secrets.DASHBOARD_WORKER_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +41,18 @@ jobs:
 
       - name: Dashboard typecheck
         working-directory: cloud/dashboard
+        env:
+          DASHBOARD_DEFAULT_PROJECT_ID: 00000000-0000-4000-8000-000000000001
+          DASHBOARD_DEFAULT_REGION: us
+          DASHBOARD_US_SUPABASE_URL: https://example-us.supabase.co
+          DASHBOARD_US_SUPABASE_SERVICE_ROLE_KEY: test-us-service-role
+          DASHBOARD_EU_SUPABASE_URL: https://example-eu.supabase.co
+          DASHBOARD_EU_SUPABASE_SERVICE_ROLE_KEY: test-eu-service-role
+          DASHBOARD_WORKER_BASE_URL: https://example.workers.dev
+          DASHBOARD_WORKER_TOKEN: test-dashboard-worker-token
+          DASHBOARD_CONTROL_SUPABASE_URL: https://example-control.supabase.co
+          DASHBOARD_CONTROL_SUPABASE_SERVICE_ROLE_KEY: test-control-service-role
+          DASHBOARD_APP_SESSION_SECRET: test-dashboard-session-secret
         run: |
           npm install
           npm run typecheck
@@ -44,8 +62,26 @@ jobs:
       - name: RN cloud uploader typecheck
         working-directory: react-native/circlebox-cloud-react-native
         run: |
-          npm install
+          npm ci --include=dev
           npm run typecheck
+
+      - name: Worker ingest smoke (optional when secrets are set)
+        if: ${{ env.CIRCLEBOX_WORKER_BASE_URL != '' && env.CIRCLEBOX_SMOKE_INGEST_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_ingest.sh \
+            --base-url "${{ env.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ env.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --dashboard-token "${{ env.DASHBOARD_WORKER_TOKEN }}" \
+            --skip-download-check
+
+      - name: Worker usage/key-auth smoke (optional when control-plane secrets are set)
+        if: ${{ env.CIRCLEBOX_WORKER_BASE_URL != '' && env.CIRCLEBOX_SMOKE_INGEST_KEY != '' && env.CONTROL_SUPABASE_URL != '' && env.CONTROL_SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: |
+          scripts/smoke_test_worker_usage_telemetry.sh \
+            --base-url "${{ env.CIRCLEBOX_WORKER_BASE_URL }}" \
+            --ingest-key "${{ env.CIRCLEBOX_SMOKE_INGEST_KEY }}" \
+            --control-url "${{ env.CONTROL_SUPABASE_URL }}" \
+            --control-service-role "${{ env.CONTROL_SUPABASE_SERVICE_ROLE_KEY }}"
 
   ios-cloud:
     runs-on: macos-latest
@@ -84,6 +120,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Local dependency override
+        run: |
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            circlebox_flutter:
+              path: ../circlebox_flutter
+          EOF
       - name: Pub get
         run: flutter pub get
       - name: Analyze

@@ -66,4 +66,12 @@ final class CircleBoxRingBufferTests: XCTestCase {
         XCTAssertEqual(snapshot.count, 50)
         XCTAssertEqual(snapshot, snapshot.sorted())
     }
+
+    func testAppendReturnsInsertedValue() {
+        let buffer = CircleBoxRingBuffer<Int64>(capacity: 5)
+        let inserted = buffer.append { $0 * 10 }
+
+        XCTAssertEqual(inserted, 0)
+        XCTAssertEqual(buffer.snapshot(), [0])
+    }
 }

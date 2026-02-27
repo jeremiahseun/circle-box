@@ -8,12 +8,17 @@ Phase 2 integrations are implemented as companion modules/packages.
 - iOS: `integrations/ios/CircleBoxIntegrations`
 - Android: `integrations/android/circlebox-integrations`
 - Flutter: `flutter/circlebox_adapters`
+- React Native: `react-native/circlebox-react-native` realtime adapter helpers
 
 ## Design Principles
 
 - No direct Sentry/PostHog dependency in core CircleBox SDKs.
 - Deterministic mapping from CircleBox exports to downstream telemetry.
 - Preserve chronology and severity semantics.
+- Include attribution fields in forwarded payloads:
+  - `circlebox_source=circlebox`
+  - `circlebox_mode=export_adapter|realtime_adapter`
+  - `circlebox_sdk=<platform>@<version|name>`
 
 ## Sentry Mapping
 
@@ -62,6 +67,14 @@ await CircleBoxAdapterForwarder.forwardExportPaths(
   },
 );
 ```
+
+## Realtime Forwarding
+
+High-signal realtime forwarding is available in Flutter and React Native helpers.
+
+- Default stream policy forwards: `warn/error/fatal`, `breadcrumb`, `native_exception_prehook`
+- Optional `forwardAll` toggle can include all events
+- Forwarding paths are best-effort and non-throwing
 
 ## Scope
 

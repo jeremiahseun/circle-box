@@ -2,6 +2,7 @@ import Foundation
 
 final class CircleBoxRuntime {
     private let stateQueue = DispatchQueue(label: "com.circlebox.sdk.runtime")
+    private let observerQueue = DispatchQueue(label: "com.circlebox.sdk.runtime.observers")
     private let fileStore: CircleBoxFileStore
     private let environmentProvider: () -> CircleBoxEnvironment
 
@@ -11,6 +12,7 @@ final class CircleBoxRuntime {
     private var monitors: CircleBoxSystemMonitors?
     private var crashHandler: CircleBoxCrashHandler?
     private var signalCrashHandler: CircleBoxSignalCrashHandler?
+    private var eventObservers: [UUID: (CircleBoxEvent) -> Void] = [:]
     private var started = false
 
     init(
@@ -123,6 +125,20 @@ final class CircleBoxRuntime {
         let events = ringBuffer.snapshot()
         let clamped = max(1, maxEvents)
         return Array(events.suffix(clamped))
+    }
+
+    func addEventObserver(_ observer: @escaping (CircleBoxEvent) -> Void) -> UUID {
+        let token = UUID()
+        stateQueue.sync {
+            eventObservers[token] = observer
+        }
+        return token
+    }
+
+    func removeEventObserver(_ token: UUID) {
+        _ = stateQueue.sync {
+            eventObservers.removeValue(forKey: token)
+        }
     }
 
     func recoverPendingFromSignalMarkerIfNeeded() {
@@ -245,7 +261,7 @@ final class CircleBoxRuntime {
         let activeConfig = stateQueue.sync { config }
         let sanitizedAttrs = CircleBoxSanitizer.sanitize(attrs: attrs, config: activeConfig)
 
-        ringBuffer.append { seq in
+        let event = ringBuffer.append { seq in
             CircleBoxEvent(
                 seq: seq,
                 timestampUnixMs: Self.nowMs(),
@@ -256,9 +272,21 @@ final class CircleBoxRuntime {
                 attrs: sanitizedAttrs
             )
         }
+        notifyEventObservers(event)
 
         if persistCheckpoint {
             writeCheckpointBestEffort()
+        }
+    }
+
+    private func notifyEventObservers(_ event: CircleBoxEvent) {
+        let observers = stateQueue.sync { Array(eventObservers.values) }
+        guard !observers.isEmpty else { return }
+
+        observerQueue.async {
+            for observer in observers {
+                observer(event)
+            }
         }
     }
 
