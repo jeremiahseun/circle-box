@@ -108,6 +108,13 @@ h1 { font-size: 2.5rem; }
 h2 { font-size: 2rem; }
 h3 { font-size: 1.5rem; }
 
+/* Responsive Typography */
+@media (max-width: 768px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.75rem; }
+  h3 { font-size: 1.25rem; }
+}
+
 p {
   margin: 0 0 var(--space-4);
   color: var(--c-ink-soft);
@@ -142,6 +149,7 @@ code {
   color: var(--c-ink);
   box-shadow: var(--shadow-sm);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -182,6 +190,17 @@ code {
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
 }
 
+.btn-sm {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.85rem;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
 /* Badges */
 .badge {
   display: inline-flex;
@@ -208,6 +227,7 @@ code {
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-8) var(--space-5) 120px;
+  width: 100%;
 }
 
 .grid-3 {
@@ -222,9 +242,158 @@ code {
   gap: var(--space-6);
 }
 
-@media (max-width: 920px) {
-  .grid-3, .grid-4 {
-    grid-template-columns: 1fr;
+@media (max-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .page-shell { padding: var(--space-6) var(--space-4) 80px; }
+}
+
+/* Header Styles */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--c-border);
+  height: 72px;
+  display: flex;
+  align-items: center;
+}
+
+.site-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 700;
+  color: var(--c-ink);
+  font-size: 1.25rem;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--c-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 6px -1px rgba(15, 76, 58, 0.2);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.nav-link {
+  color: var(--c-ink-soft);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  color: var(--c-primary);
+}
+
+.nav-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--c-border);
+  margin: 0 var(--space-2);
+}
+
+/* Mobile Navigation */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--c-ink);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.mobile-nav {
+  display: none;
+  position: absolute;
+  top: 72px;
+  left: 0;
+  right: 0;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  padding: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-lg);
+}
+
+.mobile-nav.open {
+  display: flex;
+}
+
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .mobile-menu-btn { display: block; }
+  .site-header-inner { padding: 0 var(--space-4); }
+}
+
+/* Footer Styles */
+.site-footer {
+  border-top: 1px solid var(--c-border);
+  background: var(--c-surface);
+  padding: var(--space-8) 0;
+  margin-top: auto;
+}
+
+.site-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.footer-links {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.footer-links a {
+  color: var(--c-ink-soft);
+  font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+  color: var(--c-primary);
+}
+
+@media (min-width: 768px) {
+  .site-footer-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
   }
 }
 
@@ -233,12 +402,14 @@ code {
   overflow-x: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--c-border);
+  margin-bottom: var(--space-4);
 }
 
 table {
   border-collapse: collapse;
   width: 100%;
   background: var(--c-surface);
+  min-width: 600px; /* Ensure tables don't squash too much */
 }
 
 th {
@@ -251,6 +422,7 @@ th {
   color: var(--c-ink-soft);
   font-weight: 600;
   background: var(--c-bg);
+  white-space: nowrap;
 }
 
 td {
