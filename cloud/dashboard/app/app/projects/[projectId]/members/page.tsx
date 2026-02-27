@@ -27,7 +27,7 @@ export default async function ProjectMembersPage({ params }: ProjectMembersPageP
       <Card>
         <div style={{ padding: 20 }}>
           <h1 style={{ marginBottom: 8 }}>{project.name} Members</h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+          <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
             Owner/member model for MVP. Owners control keys and invites.
           </p>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
