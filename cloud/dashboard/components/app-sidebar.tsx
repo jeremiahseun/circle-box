@@ -12,9 +12,9 @@ type AppSidebarProps = {
 export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
   const pathname = usePathname();
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Determine active project from pathname: /app/projects/[projectId]
-  // This is a naive split, but sufficient for this structure.
   const pathParts = pathname?.split("/") || [];
   const projectIndex = pathParts.indexOf("projects");
   const projectIdFromUrl = projectIndex !== -1 && pathParts.length > projectIndex + 1 ? pathParts[projectIndex + 1] : null;
@@ -27,31 +27,52 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
       <a
         href={href}
         className={`nav-item ${isActive ? "active" : ""}`}
+        title={isCollapsed ? label : undefined}
       >
         <span className="nav-icon">{icon}</span>
-        <span className="nav-label">{label}</span>
+        {!isCollapsed && <span className="nav-label">{label}</span>}
       </a>
     );
   };
 
   return (
-    <aside className="app-sidebar">
+    <aside className={`app-sidebar ${isCollapsed ? "collapsed" : ""}`}>
+      {/* Sidebar Toggle */}
+      <button
+        className="collapse-toggle-btn"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-label="Toggle Sidebar"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {isCollapsed ? (
+             <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
+          ) : (
+             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+          )}
+        </svg>
+      </button>
+
       {/* Project Switcher */}
       <div className="project-switcher-container">
         <button
           className="project-switcher-btn"
           onClick={() => setIsProjectsOpen(!isProjectsOpen)}
+          title={isCollapsed && activeProject ? activeProject.name : undefined}
         >
           <div className="project-avatar">
             {activeProject ? activeProject.name.substring(0, 2).toUpperCase() : "+"}
           </div>
-          <div className="project-info">
-            <span className="project-name">{activeProject ? activeProject.name : "Select Project"}</span>
-            <span className="project-plan">{activeProject ? activeProject.plan_tier : "Free"}</span>
-          </div>
-          <svg className="switcher-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          {!isCollapsed && (
+            <>
+              <div className="project-info">
+                <span className="project-name">{activeProject ? activeProject.name : "Select Project"}</span>
+                <span className="project-plan">{activeProject ? activeProject.plan_tier : "Free"}</span>
+              </div>
+              <svg className="switcher-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </>
+          )}
         </button>
 
         {/* Dropdown */}
@@ -61,14 +82,15 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
             {projects.map(project => (
               <a
                 key={project.id}
-                href={`/app/projects/${project.id}/keys`}
+                href={`/app/projects/${project.id}/crashes`}
                 className={`dropdown-item ${project.id === activeProject?.id ? "active" : ""}`}
+                onClick={() => setIsProjectsOpen(false)}
               >
                 {project.name}
               </a>
             ))}
             <div className="dropdown-divider" />
-            <a href="/app/projects/new" className="dropdown-item create-new">
+            <a href="/app/projects/new" className="dropdown-item create-new" onClick={() => setIsProjectsOpen(false)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -82,7 +104,14 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
       {activeProject && (
         <nav className="sidebar-nav">
           <div className="nav-group">
-            <div className="nav-group-title">ANALYTICS</div>
+            {!isCollapsed && <div className="nav-group-title">ANALYTICS</div>}
+            {isCollapsed && <div className="nav-divider" />}
+            <NavItem
+              href={`/app/projects/${activeProject.id}`}
+              exact
+              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>}
+              label="Overview"
+            />
             <NavItem
               href={`/app/projects/${activeProject.id}/crashes`}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>}
@@ -96,7 +125,8 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           </div>
 
           <div className="nav-group">
-            <div className="nav-group-title">CONFIGURATION</div>
+            {!isCollapsed && <div className="nav-group-title">CONFIGURATION</div>}
+            {isCollapsed && <div className="nav-divider" />}
             <NavItem
               href={`/app/projects/${activeProject.id}/keys`}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>}
@@ -120,10 +150,10 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
       <div className="sidebar-footer">
         <div className="user-info">
           <div className="user-avatar">{userEmail.substring(0, 1).toUpperCase()}</div>
-          <span className="user-email" title={userEmail}>{userEmail}</span>
+          {!isCollapsed && <span className="user-email" title={userEmail}>{userEmail}</span>}
         </div>
         <form action="/api/auth/logout" method="POST">
-            <button className="logout-btn" type="submit" aria-label="Sign out">
+            <button className="logout-btn" type="submit" aria-label="Sign out" title="Sign out">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                     <polyline points="16 17 21 12 16 7"></polyline>
@@ -143,12 +173,46 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           height: calc(100vh - 72px); /* Minus header */
           position: sticky;
           top: 72px;
+          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .app-sidebar.collapsed {
+            width: 80px;
+        }
+
+        .collapse-toggle-btn {
+            position: absolute;
+            right: -12px;
+            top: 24px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #64748b;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .collapse-toggle-btn:hover {
+            color: #1e293b;
+            border-color: #cbd5e1;
         }
 
         .project-switcher-container {
           padding: 16px;
           border-bottom: 1px solid #e2e8f0;
           position: relative;
+        }
+
+        .app-sidebar.collapsed .project-switcher-container {
+            padding: 16px 8px;
+            display: flex;
+            justify-content: center;
         }
 
         .project-switcher-btn {
@@ -163,6 +227,12 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           cursor: pointer;
           transition: all 0.2s;
           text-align: left;
+        }
+
+        .app-sidebar.collapsed .project-switcher-btn {
+            padding: 8px;
+            width: auto;
+            justify-content: center;
         }
 
         .project-switcher-btn:hover {
@@ -181,6 +251,7 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           justify-content: center;
           font-weight: 700;
           font-size: 14px;
+          flex-shrink: 0;
         }
 
         .project-info {
@@ -207,6 +278,7 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
 
         .switcher-arrow {
           color: #94a3b8;
+          flex-shrink: 0;
         }
 
         .project-dropdown {
@@ -222,6 +294,12 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           padding: 4px;
         }
 
+        .app-sidebar.collapsed .project-dropdown {
+            left: 100%;
+            top: 0;
+            width: 240px;
+        }
+
         .dropdown-header {
           padding: 8px 12px;
           font-size: 11px;
@@ -231,15 +309,19 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
         }
 
         .dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          display: block; /* Ensure it takes full width */
           padding: 8px 12px;
           font-size: 14px;
           color: #334155;
           text-decoration: none;
           border-radius: 4px;
           transition: background 0.1s;
+        }
+
+        .dropdown-item.create-new {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .dropdown-item:hover {
@@ -266,6 +348,11 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           flex: 1;
           padding: 16px 12px;
           overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        .app-sidebar.collapsed .sidebar-nav {
+            padding: 16px 8px;
         }
 
         .nav-group {
@@ -280,6 +367,13 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           color: #94a3b8;
           text-transform: uppercase;
           letter-spacing: 0.05em;
+          white-space: nowrap;
+        }
+
+        .nav-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 16px 12px 16px;
         }
 
         .nav-item {
@@ -292,6 +386,12 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           border-radius: 6px;
           margin-bottom: 2px;
           transition: all 0.2s;
+          white-space: nowrap;
+        }
+
+        .app-sidebar.collapsed .nav-item {
+            justify-content: center;
+            padding: 10px;
         }
 
         .nav-item:hover {
@@ -300,7 +400,6 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
         }
 
         .nav-item.active {
-          background: #eef2ff; /* Using slate/indigo tint */
           background: #f0fdf4; /* Emerald tint */
           color: #0f4c3a;
           font-weight: 500;
@@ -311,6 +410,7 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           align-items: center;
           justify-content: center;
           opacity: 0.8;
+          flex-shrink: 0;
         }
 
         .nav-item.active .nav-icon {
@@ -319,6 +419,8 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
 
         .nav-label {
           font-size: 14px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .sidebar-footer {
@@ -328,6 +430,13 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           align-items: center;
           justify-content: space-between;
           background: white;
+          overflow: hidden;
+        }
+
+        .app-sidebar.collapsed .sidebar-footer {
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px 8px;
         }
 
         .user-info {
@@ -348,6 +457,7 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
           justify-content: center;
           font-weight: 600;
           font-size: 12px;
+          flex-shrink: 0;
         }
 
         .user-email {
@@ -367,6 +477,9 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
             padding: 4px;
             border-radius: 4px;
             transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .logout-btn:hover {
@@ -376,7 +489,7 @@ export function AppSidebar({ projects, userEmail }: AppSidebarProps) {
 
         @media (max-width: 768px) {
           .app-sidebar {
-            display: none; /* Mobile handling needed later, simpler to hide for MVP sidebar */
+            display: none;
           }
         }
       `}</style>

@@ -50,17 +50,20 @@
   color: var(--c-ink-soft);
 }
 
+/* Timeline Card Animation */
 .timeline-card {
   border: 1px solid var(--c-border);
   background: var(--c-surface);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
-  transform: rotate(-2deg);
-  transition: transform var(--trans-base);
+  transform: perspective(1000px) rotateY(-5deg) rotateX(2deg) translateZ(0);
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.6s ease;
+  will-change: transform;
 }
 
 .timeline-card:hover {
-  transform: rotate(0deg) scale(1.02);
+  transform: perspective(1000px) rotateY(0deg) rotateX(0deg) translateZ(20px);
+  box-shadow: 0 30px 40px -10px rgba(15, 76, 58, 0.15);
 }
 
 .timeline-header {
@@ -110,12 +113,33 @@
   font-family: var(--font-mono);
   font-size: 0.85rem;
   border: 1px solid transparent;
+  /* Cascade entrance animation */
+  opacity: 0;
+  animation: slide-in-row 0.5s ease-out forwards;
+}
+
+.timeline-row:nth-child(1) { animation-delay: 0.1s; }
+.timeline-row:nth-child(2) { animation-delay: 0.2s; }
+.timeline-row:nth-child(3) { animation-delay: 0.3s; }
+.timeline-row:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes slide-in-row {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 .timeline-row.highlight {
   background: #fef2f2;
   border-color: #fecaca;
+  animation: flash-highlight 2s ease-in-out infinite alternate;
+  animation-delay: 0.5s; /* Wait for entrance */
 }
+
+@keyframes flash-highlight {
+    from { background: #fef2f2; border-color: #fecaca; box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+    to { background: #fee2e2; border-color: #fca5a5; box-shadow: 0 0 10px rgba(239, 68, 68, 0.1); }
+}
+
 
 .seq {
   color: var(--c-ink-faint);
@@ -183,6 +207,12 @@
   border: 1px solid var(--c-border);
   border-radius: var(--radius-lg);
   position: relative;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.flow-step:hover {
+    transform: translateY(-4px);
+    border-color: var(--c-accent);
 }
 
 .step-number {
@@ -275,4 +305,5 @@
   .hero-lead { margin-left: auto; margin-right: auto; }
   .install-grid { grid-template-columns: 1fr 1fr; }
   .timeline-card { transform: none; margin-top: var(--space-8); }
+  .timeline-card:hover { transform: translateY(-4px); }
 }
