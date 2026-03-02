@@ -39,10 +39,20 @@ export default async function ProjectInvitesPage({
 
   return (
     <section style={{ display: "grid", gap: 14 }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: "-8px" }}>
+        <a href={`/app/projects/${project.id}`} className="btn btn-sm" style={{ padding: "6px 12px", display: "inline-flex", gap: "6px", alignItems: "center", background: "transparent", border: "1px solid var(--c-border)", color: "var(--c-ink-soft)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to Dashboard
+        </a>
+      </div>
+
       <Card>
         <div style={{ padding: 20 }}>
           <h1 style={{ marginBottom: 8 }}>{project.name} Invites</h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+          <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
             Invite flow is owner-controlled in MVP. Members can view project data and use existing keys.
           </p>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
@@ -56,14 +66,14 @@ export default async function ProjectInvitesPage({
 
       {error && (
         <Card>
-          <div style={{ padding: 14, color: "var(--danger)" }}>
+          <div style={{ padding: 14, color: "var(--c-danger)" }}>
             Action failed: <code>{error}</code>
           </div>
         </Card>
       )}
       {success && (
         <Card>
-          <div style={{ padding: 14, color: "var(--accent-strong)" }}>
+          <div style={{ padding: 14, color: "var(--c-accent)" }}>
             Action completed: <code>{success}</code>
           </div>
         </Card>
@@ -73,7 +83,7 @@ export default async function ProjectInvitesPage({
         <Card>
           <div style={{ padding: 16 }}>
             <h3 style={{ marginTop: 0 }}>Invite Token (Shown Once)</h3>
-            <p style={{ color: "var(--ink-soft)" }}>
+            <p style={{ color: "var(--c-ink-soft)" }}>
               Share this token with teammates. They can accept from the <a href="/app/invites/accept">invite acceptance page</a>.
             </p>
             <code style={{ display: "block", wordBreak: "break-all" }}>{inviteToken}</code>
@@ -84,16 +94,16 @@ export default async function ProjectInvitesPage({
       <Card>
         <div style={{ padding: 16 }}>
           <h3 style={{ marginTop: 0 }}>Create Invite</h3>
-          <p style={{ color: "var(--ink-soft)" }}>
+          <p style={{ color: "var(--c-ink-soft)" }}>
             Invite tokens are reusable until revoked or expired.
           </p>
-          {!isOwner && <p style={{ color: "var(--ink-soft)" }}>Only owners can create invites.</p>}
+          {!isOwner && <p style={{ color: "var(--c-ink-soft)" }}>Only owners can create invites.</p>}
           <form action={`/api/projects/${project.id}/invites/create`} method="POST" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <label>
               Expires (days){" "}
-              <input name="expires_in_days" type="number" min={1} max={30} defaultValue={7} style={{ width: 120 }} disabled={!isOwner} />
+              <input name="expires_in_days" type="number" min={1} max={30} defaultValue={7} style={{ width: 120, marginTop: "4px" }} disabled={!isOwner} />
             </label>
-            <button className="btn btn-primary" type="submit" disabled={!isOwner}>Create Invite</button>
+            <button className="btn btn-primary" type="submit" disabled={!isOwner} style={{ alignSelf: "flex-end" }}>Create Invite</button>
           </form>
         </div>
       </Card>
@@ -124,7 +134,7 @@ export default async function ProjectInvitesPage({
                       <td>
                         <form action={`/api/projects/${project.id}/invites/${invite.id}/revoke`} method="POST">
                           <button
-                            className="btn"
+                            className="btn btn-sm"
                             type="submit"
                             disabled={!isOwner || Boolean(invite.revoked_at)}
                           >

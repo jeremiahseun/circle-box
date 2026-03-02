@@ -1,8 +1,8 @@
 export const platformInstallTargets = [
-  { label: "Swift (SPM)", path: "/docs/ios-quickstart" },
-  { label: "Kotlin (AAR)", path: "/docs/android-quickstart" },
-  { label: "Flutter", path: "/docs/flutter-quickstart" },
-  { label: "React Native", path: "/docs/react-native-quickstart" },
+  { label: "Swift", path: "/docs/ios-quickstart", sub: "(SPM)", icon: "swift" },
+  { label: "Kotlin", path: "/docs/android-quickstart", sub: "(AAR)", icon: "kotlin" },
+  { label: "Flutter", path: "/docs/flutter-quickstart", sub: "(Dart)", icon: "flutter" },
+  { label: "React Native", path: "/docs/react-native-quickstart", sub: "(NPM)", icon: "react" },
 ] as const;
 
 export const comparisonRows = [

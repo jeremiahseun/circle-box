@@ -25,10 +25,20 @@ export default async function ProjectUsagePage({ params }: ProjectUsagePageProps
 
   return (
     <section style={{ display: "grid", gap: 14 }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: "-8px" }}>
+        <a href={`/app/projects/${project.id}`} className="btn btn-sm" style={{ padding: "6px 12px", display: "inline-flex", gap: "6px", alignItems: "center", background: "transparent", border: "1px solid var(--c-border)", color: "var(--c-ink-soft)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to Dashboard
+        </a>
+      </div>
+
       <Card>
         <div style={{ padding: 20 }}>
           <h1 style={{ marginBottom: 8 }}>{project.name} Usage</h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+          <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
             Billing meter: reports + storage. Usage beacon telemetry is optional and off by default.
           </p>
           <p style={{ marginTop: 10, marginBottom: 0 }}>
