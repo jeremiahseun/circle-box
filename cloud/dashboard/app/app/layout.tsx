@@ -1,49 +1,49 @@
 import type { ReactNode } from "react";
 import { listProjectsForUser } from "../../lib/control-plane";
 import { requireSession } from "../../lib/session";
-import { Card } from "../../components/ui/card";
+import { AppSidebar } from "../../components/app-sidebar";
 
-export default async function AppLayout(props: { children: ReactNode }) {
+export default async function AppLayout(props: { children: ReactNode; params: { projectId?: string } }) {
   const session = await requireSession();
   const projects = await listProjectsForUser(session.userId);
 
+  // Note: Since this layout wraps nested routes like /app/projects/[projectId]/...,
+  // accessing params here might be tricky in Next.js 14 layouts depending on hierarchy.
+  // However, we can just pass the projects list to the client sidebar
+  // and let the client sidebar determine the active project from the URL using usePathname.
+
+  // Actually, we can try to extract projectId from children or context, but client-side matching is robust.
+
   return (
-    <section style={{ display: "grid", gap: 16 }}>
-      <Card>
-        <div style={{ padding: 18, display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <strong>Workspace</strong>
-              <div style={{ color: "var(--ink-soft)" }}>{session.email}</div>
-            </div>
-            <form action="/api/auth/logout" method="POST">
-              <button className="btn" type="submit">Log out</button>
-            </form>
-          </div>
+    <div className="app-shell">
+      <AppSidebar
+        projects={projects}
+        userEmail={session.email}
+        // We let the client component determine active ID via usePathname
+      />
+      <main className="app-content">
+        {props.children}
+      </main>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <a className="btn" href="/app/onboarding">Onboarding</a>
-            <a className="btn" href="/app/projects/new">New Project</a>
-            <a className="btn" href={projects.length > 0 ? `/app/projects/${projects[0].id}/crashes` : "/app/onboarding"}>
-              Crash Explorer
-            </a>
-            <a className="btn" href="/app/invites/accept">Accept Invite</a>
-            <a className="btn" href="/docs/cloud-quickstart">Cloud Docs</a>
-          </div>
+      <style>{`
+        .app-shell {
+          display: flex;
+          min-height: calc(100vh - 72px); /* Minus header height */
+          background: #f8fafc;
+        }
 
-          {projects.length > 0 && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {projects.slice(0, 8).map((project) => (
-                <a key={project.id} className="badge" href={`/app/projects/${project.id}/keys`}>
-                  {project.name} ({project.region.toUpperCase()})
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
+        .app-content {
+          flex: 1;
+          padding: 32px;
+          overflow-x: hidden;
+        }
 
-      {props.children}
-    </section>
+        @media (max-width: 768px) {
+          .app-content {
+            padding: 16px;
+          }
+        }
+      `}</style>
+    </div>
   );
 }

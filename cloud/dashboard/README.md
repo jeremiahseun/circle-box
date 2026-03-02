@@ -9,6 +9,33 @@ Single Next.js app for:
 
 The dashboard reads crash data from regional Supabase data planes and requests signed raw-download URLs from the worker.
 
+## Brand Guidelines
+
+We aim for a "Psychology Premium" aesthetic—trustworthy, clean, and cognitively fluent.
+
+### Colors
+
+- **Primary**: `#0f4c3a` (Deep Forest) - Used for headers, primary actions (hover), and strong branding.
+- **Accent**: `#10b981` (Emerald) - Used for success states, highlights, and primary buttons.
+- **Background**: `#f8fafc` (Ice White) - A very subtle cool gray/white for the main background.
+- **Surface**: `#ffffff` (Pure White) - Used for cards and panels.
+- **Ink**: `#1e293b` (Slate 800) - Primary text.
+- **Ink Soft**: `#64748b` (Slate 500) - Secondary text.
+- **Border**: `#e2e8f0` (Slate 200) - Subtle separation.
+
+### Typography
+
+- **Sans**: `Inter`, system-ui, -apple-system, sans-serif.
+- **Mono**: `JetBrains Mono`, `SFMono-Regular`, monospace.
+
+### Principles
+
+1.  **The Halo Effect**: First impressions matter. High-quality visuals and clean layout.
+2.  **Cognitive Fluency**: Easy to read, standard patterns, generous whitespace.
+3.  **Micro-Interactions**: Subtle feedbacks on hover/focus to delight the user.
+4.  **White Space Strategy**: Use space to group related content and separate distinct sections.
+5.  **Clarity**: Data density should be high but decipherable.
+
 ## Environment
 
 Copy `.env.local.example` to `.env.local` and fill all values:

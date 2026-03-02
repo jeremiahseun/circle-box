@@ -14,9 +14,9 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
       <section style={{ display: "grid", gap: 16 }}>
         <Card>
           <div style={{ padding: 20 }}>
-            <h2 style={{ marginTop: 0 }}>Crash Timeline Explorer</h2>
+            <h2 style={{ marginTop: 0 }}>Project Scope Required</h2>
             <p style={{ marginBottom: 0 }}>
-              No project selected. Use <code>project_id</code> query param or set <code>DASHBOARD_DEFAULT_PROJECT_ID</code>.
+              No project selected. Please select a project from the settings or use <code>project_id</code> query param.
             </p>
           </div>
         </Card>
@@ -43,77 +43,128 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
   }
 
   return (
-    <section style={{ display: "grid", gap: 16 }}>
-      <Card>
-        <div style={{ padding: 20 }}>
-          <h2 style={{ marginTop: 0 }}>Crash Timeline Explorer</h2>
-          <p style={{ marginBottom: 0 }}>
-            Project: <code>{projectId}</code> | Region: <code>{scope.region}</code>
-          </p>
-        </div>
-      </Card>
+    <section style={{ display: "grid", gap: "var(--space-6)" }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: "-8px" }}>
+        <a href={`/app/projects/${projectId}`} className="btn btn-sm" style={{ padding: "6px 12px", display: "inline-flex", gap: "6px", alignItems: "center", background: "transparent", border: "1px solid var(--c-border)", color: "var(--c-ink-soft)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to Dashboard
+        </a>
+      </div>
 
+      {/* Filters Card */}
       <Card>
-        <div style={{ padding: 18 }}>
-          <form method="GET" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ padding: "var(--space-5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem" }}>Filters</h3>
+                <div style={{ fontSize: "0.85rem", color: "var(--c-ink-soft)" }}>
+                    Project: <code style={{ color: "var(--c-primary)" }}>{projectId}</code> | Region: <code>{scope.region}</code>
+                </div>
+            </div>
+          <form method="GET" style={{ display: "flex", gap: "var(--space-3)", alignItems: "end", flexWrap: "wrap" }}>
             <input type="hidden" name="project_id" value={projectId} />
             <input type="hidden" name="region" value={scope.region} />
-            <label>
-              Platform{" "}
-              <input
-                name="platform"
-                defaultValue={platform}
-                placeholder="ios | android"
-                style={{ minWidth: 160 }}
-              />
-            </label>
-            <label>
-              Fingerprint{" "}
-              <input
-                name="crash_fingerprint"
-                defaultValue={crashFingerprint}
-                placeholder="fp_..."
-                style={{ minWidth: 180 }}
-              />
-            </label>
-            <label>
-              Limit{" "}
-              <input name="limit" defaultValue={String(Number.isFinite(limit) ? limit : 100)} style={{ width: 80 }} />
-            </label>
-            <button className="btn" type="submit">Apply Filters</button>
+            <div style={{ flex: 1, minWidth: "160px" }}>
+                <label>Platform</label>
+                <select name="platform" defaultValue={platform} style={{ width: "100%" }}>
+                    <option value="">All Platforms</option>
+                    <option value="ios">iOS</option>
+                    <option value="android">Android</option>
+                    <option value="flutter">Flutter</option>
+                    <option value="react-native">React Native</option>
+                </select>
+            </div>
+            <div style={{ flex: 2, minWidth: "220px" }}>
+                <label>Fingerprint</label>
+                <input
+                    name="crash_fingerprint"
+                    defaultValue={crashFingerprint}
+                    placeholder="Search fingerprint..."
+                    style={{ width: "100%" }}
+                />
+            </div>
+            <div style={{ width: "80px" }}>
+                <label>Limit</label>
+                <input name="limit" type="number" defaultValue={String(Number.isFinite(limit) ? limit : 100)} style={{ width: "100%" }} />
+            </div>
+            <button className="btn btn-primary" type="submit" style={{ height: "42px" }}>Apply</button>
           </form>
         </div>
       </Card>
 
       {dataError && (
-        <p style={{ color: "var(--danger)" }}>
+        <div style={{ padding: "var(--space-4)", background: "var(--c-danger-bg)", color: "var(--c-danger)", borderRadius: "var(--radius-md)" }}>
           Query failed: <code>{dataError}</code>
-        </p>
+        </div>
       )}
 
-      {!dataError && reports.length === 0 && <p>No reports found for current filter scope.</p>}
+      {!dataError && reports.length === 0 && (
+          <div style={{ textAlign: "center", padding: "var(--space-12)", color: "var(--c-ink-soft)" }}>
+              <p>No crash reports found matching your criteria.</p>
+          </div>
+      )}
 
+      {/* Grouped Fingerprints Table */}
       {!dataError && reports.length > 0 && (
         <Card>
-          <div style={{ padding: "6px 16px 12px" }}>
-            <h3>Grouped Fingerprints</h3>
+          <div style={{ padding: "var(--space-5)" }}>
+            <h3 style={{ marginTop: 0, marginBottom: "var(--space-4)", fontSize: "1.1rem" }}>Top Issues</h3>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Fingerprint</th>
-                    <th>Impact Count</th>
-                    <th>Last Seen</th>
-                    <th>Platform Mix</th>
+                    <th style={{ width: "120px" }}>Impact</th>
+                    <th style={{ width: "180px" }}>Last Seen</th>
+                    <th style={{ width: "150px" }}>Platforms</th>
                   </tr>
                 </thead>
                 <tbody>
                   {groupReportsByFingerprint(reports).map((group) => (
                     <tr key={group.key}>
-                      <td>{group.fingerprint}</td>
-                      <td>{group.count}</td>
-                      <td>{new Date(group.lastSeenUnixMs).toLocaleString()}</td>
-                      <td>{group.platforms.join(", ")}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>
+                          <span style={{
+                              display: "inline-block",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              background: "var(--c-bg)",
+                              border: "1px solid var(--c-border)"
+                          }}>
+                              {group.fingerprint.substring(0, 32)}{group.fingerprint.length > 32 ? "..." : ""}
+                          </span>
+                      </td>
+                      <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontWeight: 700 }}>{group.count}</span>
+                              <div style={{
+                                  height: "4px",
+                                  flex: 1,
+                                  background: "var(--c-bg)",
+                                  borderRadius: "2px",
+                                  overflow: "hidden"
+                              }}>
+                                  <div style={{
+                                      height: "100%",
+                                      width: `${Math.min(100, (group.count / reports.length) * 100)}%`,
+                                      background: "var(--c-danger)"
+                                  }} />
+                              </div>
+                          </div>
+                      </td>
+                      <td style={{ color: "var(--c-ink-soft)", fontSize: "0.85rem" }}>
+                          {new Date(group.lastSeenUnixMs).toLocaleString()}
+                      </td>
+                      <td>
+                          <div style={{ display: "flex", gap: "4px" }}>
+                            {group.platforms.map(p => (
+                                <span key={p} className="badge" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
+                                    {p}
+                                </span>
+                            ))}
+                          </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -123,19 +174,22 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
         </Card>
       )}
 
+      {/* Recent Reports Table */}
       {!dataError && reports.length > 0 && (
         <Card>
-          <div style={{ padding: "6px 16px 12px" }}>
+          <div style={{ padding: "var(--space-5)" }}>
+            <h3 style={{ marginTop: 0, marginBottom: "var(--space-4)", fontSize: "1.1rem" }}>Recent Reports</h3>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Report</th>
+                    <th>Report ID</th>
                     <th>Platform</th>
                     <th>Version</th>
                     <th>Fingerprint</th>
                     <th>Events</th>
                     <th>Generated</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,16 +200,29 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
                     });
                     return (
                       <tr key={report.id}>
-                        <td>
-                          <a href={`${basePath}/${report.id}?${detailQuery.toString()}`}>{report.id}</a>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>
+                          <a href={`${basePath}/${report.id}?${detailQuery.toString()}`} style={{ fontWeight: 600 }}>
+                              {report.id.substring(0, 8)}...
+                          </a>
                         </td>
-                        <td>{report.platform}</td>
                         <td>
-                          {report.app_version} ({report.build_number})
+                            <span className="badge" style={{ textTransform: "capitalize" }}>{report.platform}</span>
                         </td>
-                        <td>{report.crash_fingerprint ?? "-"}</td>
+                        <td style={{ fontSize: "0.9rem" }}>
+                          {report.app_version} <span style={{ color: "var(--c-ink-faint)" }}>({report.build_number})</span>
+                        </td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--c-ink-soft)" }}>
+                            {report.crash_fingerprint ? report.crash_fingerprint.substring(0, 12) + "..." : "-"}
+                        </td>
                         <td>{report.event_count}</td>
-                        <td>{new Date(report.generated_at_unix_ms).toLocaleString()}</td>
+                        <td style={{ fontSize: "0.85rem", color: "var(--c-ink-soft)" }}>
+                            {new Date(report.generated_at_unix_ms).toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                            <a href={`${basePath}/${report.id}?${detailQuery.toString()}`} className="btn btn-sm" style={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+                                View
+                            </a>
+                        </td>
                       </tr>
                     );
                   })}

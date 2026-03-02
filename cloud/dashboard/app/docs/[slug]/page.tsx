@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getDocBySlug, listDocSummaries } from "../../../lib/docs";
+import { DocSidebar } from "../../../components/doc-sidebar";
 import { Card } from "../../../components/ui/card";
+import "../docs.css"; // Import docs specific CSS
 
 type DocPageProps = {
   params: {
@@ -15,37 +17,48 @@ export async function generateStaticParams() {
 
 export default async function DocPage({ params }: DocPageProps) {
   const [doc, nav] = await Promise.all([getDocBySlug(params.slug), listDocSummaries()]);
+
   if (!doc) {
     notFound();
   }
 
+  // Calculate Next/Prev links
+  const currentIndex = nav.findIndex(item => item.slug === params.slug);
+  const prevDoc = currentIndex > 0 ? nav[currentIndex - 1] : null;
+  const nextDoc = currentIndex < nav.length - 1 ? nav[currentIndex + 1] : null;
+
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <Card>
-        <div style={{ padding: 18 }}>
-          <span className="badge">Docs</span>
-          <h1 style={{ marginBottom: 8 }}>{doc.title}</h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>{doc.description}</p>
-        </div>
-      </Card>
+    <div className="doc-layout-grid">
+      {/* Sidebar for Desktop / Collapsible for Mobile */}
+      <DocSidebar items={nav} currentSlug={params.slug} />
 
-      <div className="docs-layout">
+      <div className="doc-content">
         <Card>
-          <nav style={{ padding: 14 }}>
-            <h3 style={{ marginTop: 0 }}>Guides</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {nav.map((entry) => (
-                <li key={entry.slug} style={{ marginBottom: 8 }}>
-                  <a href={`/docs/${entry.slug}`}>{entry.title}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </Card>
+          <article className="prose" style={{ padding: "var(--space-6)" }}>
+            <span className="badge badge-primary" style={{ marginBottom: "var(--space-4)" }}>Docs</span>
+            <h1 style={{ marginBottom: "var(--space-2)" }}>{doc.title}</h1>
+            <p style={{ fontSize: "1.1rem", color: "var(--c-ink-soft)", borderBottom: "1px solid var(--c-border)", paddingBottom: "var(--space-6)", marginBottom: "var(--space-6)" }}>
+              {doc.description}
+            </p>
 
-        <Card>
-          <article className="prose" style={{ padding: 20 }}>
             {doc.content}
+
+            {/* Next / Previous Navigation */}
+            <div className="article-nav">
+              {prevDoc ? (
+                <a href={`/docs/${prevDoc.slug}`} className="nav-card">
+                  <small>Previous</small>
+                  <span>&larr; {prevDoc.title}</span>
+                </a>
+              ) : <div />} {/* Spacer if no prev */}
+
+              {nextDoc ? (
+                <a href={`/docs/${nextDoc.slug}`} className="nav-card" style={{ textAlign: "right", alignItems: "flex-end" }}>
+                  <small>Next</small>
+                  <span>{nextDoc.title} &rarr;</span>
+                </a>
+              ) : null}
+            </div>
           </article>
         </Card>
       </div>
