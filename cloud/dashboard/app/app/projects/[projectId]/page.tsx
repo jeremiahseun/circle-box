@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { Card } from "../../../../components/ui/card";
-import { getProjectForUser, listApiKeysForProject } from "../../../../lib/control-plane";
+import { getProjectForUser, listApiKeysForProject, listUsageForProject } from "../../../../lib/control-plane";
 import { requireSession } from "../../../../lib/session";
 import { SectionTitle } from "../../../../components/ui/section-title";
+import { formatBytes, formatNumber } from "../../../../lib/ui/format";
 
 type ProjectOverviewPageProps = {
   params: { projectId: string };
@@ -19,9 +20,15 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
     notFound();
   }
 
-  // If no params are provided, we could redirect to keys or usage, but let's make a dashboard view
-  // Fetch some summary data
-  const keys = await listApiKeysForProject({ userId: session.userId, projectId: project.id });
+  const [keys, { usageRows }] = await Promise.all([
+    listApiKeysForProject({ userId: session.userId, projectId: project.id }),
+    listUsageForProject({ userId: session.userId, projectId: project.id, days: 30 }),
+  ]);
+
+  const totalReports = usageRows.reduce((sum, row) => sum + row.reports_count, 0);
+  const totalBytes = usageRows.reduce((sum, row) => sum + row.bytes_count, 0);
+  const activeKeys = keys.filter(k => k.active).length;
+  const hasUsageData = usageRows.length > 0;
 
   return (
     <div className="dashboard-container">
@@ -38,7 +45,7 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
             <a href={`/app/projects/${project.id}/crashes`} className="btn btn-primary">
                 Explore Crashes
             </a>
-            <a href="https://docs.circlebox.dev" target="_blank" className="btn">
+            <a href="/docs/getting-started" className="btn">
                 Integration Docs
             </a>
         </div>
@@ -47,28 +54,53 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
       {/* Stats Grid */}
       <div className="stats-grid">
         <Card className="stat-card">
-            <div className="stat-label">Total Crashes (30d)</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
-        </Card>
-        <Card className="stat-card">
-            <div className="stat-label">Active Users (30d)</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
-        </Card>
-        <Card className="stat-card">
-            <div className="stat-label">Active API Keys</div>
-            <div className="stat-value">{keys.filter(k => k.active).length}</div>
-            <div className="stat-delta text-neutral">
-                {keys.length} total keys
+            <div className="stat-label">Crash Reports (30d)</div>
+            <div className="stat-value">{hasUsageData ? formatNumber(totalReports) : "--"}</div>
+            <div className="stat-delta">
+              {hasUsageData
+                ? `across ${usageRows.length} days`
+                : <span style={{ color: "var(--c-ink-faint)" }}>No data yet</span>
+              }
             </div>
         </Card>
         <Card className="stat-card">
-            <div className="stat-label">Storage Used</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
+            <div className="stat-label">Active API Keys</div>
+            <div className="stat-value">{activeKeys}</div>
+            <div className="stat-delta text-neutral">
+                {keys.length} total key{keys.length !== 1 ? "s" : ""}
+            </div>
+        </Card>
+        <Card className="stat-card">
+            <div className="stat-label">Storage Used (30d)</div>
+            <div className="stat-value">{hasUsageData ? formatBytes(totalBytes) : "--"}</div>
+            <div className="stat-delta">
+              {hasUsageData
+                ? "raw report data"
+                : <span style={{ color: "var(--c-ink-faint)" }}>No data yet</span>
+              }
+            </div>
+        </Card>
+        <Card className="stat-card">
+            <div className="stat-label">Region</div>
+            <div className="stat-value" style={{ fontSize: "22px", textTransform: "uppercase" }}>{project.region}</div>
+            <div className="stat-delta text-neutral">data residency</div>
         </Card>
       </div>
+
+      {!hasUsageData && (
+        <Card>
+          <div style={{ padding: "20px 24px", display: "flex", gap: "16px", alignItems: "center" }}>
+            <div style={{ fontSize: "28px" }}>🚀</div>
+            <div>
+              <strong style={{ display: "block", marginBottom: "4px" }}>No crash data yet</strong>
+              <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--c-ink-soft)" }}>
+                Integrate the CircleBox SDK into your app and generate an ingest key to start capturing crash context.{" "}
+                <a href="/docs/getting-started">View the integration guide →</a>
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="dashboard-section">
         <SectionTitle title="Quick Actions" />
@@ -77,21 +109,21 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
                 <div style={{ padding: "24px", display: "flex", flexDirection: "column", height: "100%" }}>
                     <h3 style={{ margin: "0 0 8px 0", fontSize: "1.1rem" }}>Get Credentials</h3>
                     <p style={{ margin: "0 0 16px 0", fontSize: "0.9rem", color: "var(--c-ink-soft)", flex: 1 }}>Manage API keys for ingestion and usage reporting.</p>
-                    <a href={`/app/projects/${project.id}/keys`} className="btn btn-sm">Manage Keys &rarr;</a>
+                    <a href={`/app/projects/${project.id}/keys`} className="btn btn-sm">Manage Keys →</a>
                 </div>
             </Card>
             <Card>
                 <div style={{ padding: "24px", display: "flex", flexDirection: "column", height: "100%" }}>
                     <h3 style={{ margin: "0 0 8px 0", fontSize: "1.1rem" }}>Invite Team</h3>
                     <p style={{ margin: "0 0 16px 0", fontSize: "0.9rem", color: "var(--c-ink-soft)", flex: 1 }}>Add members to your project to collaborate on crash analysis.</p>
-                    <a href={`/app/projects/${project.id}/invites`} className="btn btn-sm">Send Invites &rarr;</a>
+                    <a href={`/app/projects/${project.id}/invites`} className="btn btn-sm">Send Invites →</a>
                 </div>
             </Card>
             <Card>
                 <div style={{ padding: "24px", display: "flex", flexDirection: "column", height: "100%" }}>
                     <h3 style={{ margin: "0 0 8px 0", fontSize: "1.1rem" }}>Check Usage</h3>
                     <p style={{ margin: "0 0 16px 0", fontSize: "0.9rem", color: "var(--c-ink-soft)", flex: 1 }}>Monitor your data consumption and plan limits.</p>
-                    <a href={`/app/projects/${project.id}/usage`} className="btn btn-sm">View Usage &rarr;</a>
+                    <a href={`/app/projects/${project.id}/usage`} className="btn btn-sm">View Usage →</a>
                 </div>
             </Card>
         </div>

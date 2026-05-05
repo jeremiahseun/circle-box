@@ -1,5 +1,6 @@
 import { listReports } from "../../lib/data-plane";
 import { firstValue, resolveDashboardScope, type DashboardSearchParams } from "../../lib/env";
+import { formatRelativeTime } from "../../lib/ui/format";
 import { Card } from "../ui/card";
 
 type CrashesPageProps = {
@@ -42,6 +43,8 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
     dataError = error instanceof Error ? error.message : "failed_to_load_reports";
   }
 
+  const fingerprints = groupReportsByFingerprint(reports);
+
   return (
     <section style={{ display: "grid", gap: "var(--space-6)" }}>
       {/* Back Button */}
@@ -57,10 +60,10 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
       {/* Filters Card */}
       <Card>
         <div style={{ padding: "var(--space-5)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: 8 }}>
                 <h3 style={{ margin: 0, fontSize: "1rem" }}>Filters</h3>
-                <div style={{ fontSize: "0.85rem", color: "var(--c-ink-soft)" }}>
-                    Project: <code style={{ color: "var(--c-primary)" }}>{projectId}</code> | Region: <code>{scope.region}</code>
+                <div style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)", fontFamily: "var(--font-mono)" }}>
+                    {scope.region.toUpperCase()} · {projectId.substring(0, 8)}…
                 </div>
             </div>
           <form method="GET" style={{ display: "flex", gap: "var(--space-3)", alignItems: "end", flexWrap: "wrap" }}>
@@ -81,92 +84,105 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
                 <input
                     name="crash_fingerprint"
                     defaultValue={crashFingerprint}
-                    placeholder="Search fingerprint..."
+                    placeholder="Filter by fingerprint…"
                     style={{ width: "100%" }}
                 />
             </div>
-            <div style={{ width: "80px" }}>
+            <div style={{ width: "90px" }}>
                 <label>Limit</label>
-                <input name="limit" type="number" defaultValue={String(Number.isFinite(limit) ? limit : 100)} style={{ width: "100%" }} />
+                <input name="limit" type="number" defaultValue={String(Number.isFinite(limit) ? limit : 100)} min="1" max="500" style={{ width: "100%" }} />
             </div>
             <button className="btn btn-primary" type="submit" style={{ height: "42px" }}>Apply</button>
+            {(platform || crashFingerprint) && (
+              <a href={`?project_id=${projectId}&region=${scope.region}`} className="btn" style={{ height: "42px" }}>Clear</a>
+            )}
           </form>
         </div>
       </Card>
 
       {dataError && (
-        <div style={{ padding: "var(--space-4)", background: "var(--c-danger-bg)", color: "var(--c-danger)", borderRadius: "var(--radius-md)" }}>
+        <div style={{ padding: "var(--space-4)", background: "var(--c-danger-bg)", color: "var(--c-danger)", borderRadius: "var(--radius-md)", fontSize: "0.9rem" }}>
           Query failed: <code>{dataError}</code>
         </div>
       )}
 
       {!dataError && reports.length === 0 && (
+        <Card>
           <div style={{ textAlign: "center", padding: "var(--space-12)", color: "var(--c-ink-soft)" }}>
-              <p>No crash reports found matching your criteria.</p>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.3, marginBottom: 12 }}>
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <p style={{ margin: 0, fontWeight: 500 }}>No crash reports found</p>
+            <p style={{ margin: "6px 0 0", fontSize: "0.875rem" }}>
+              {platform || crashFingerprint ? "Try adjusting your filters." : "Integrate the SDK and upload your first crash report to see it here."}
+            </p>
           </div>
+        </Card>
       )}
 
       {/* Grouped Fingerprints Table */}
-      {!dataError && reports.length > 0 && (
+      {!dataError && fingerprints.length > 0 && (
         <Card>
           <div style={{ padding: "var(--space-5)" }}>
-            <h3 style={{ marginTop: 0, marginBottom: "var(--space-4)", fontSize: "1.1rem" }}>Top Issues</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+              <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: "1.1rem" }}>Top Issues</h3>
+              <span style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)" }}>
+                {fingerprints.length} unique crash signature{fingerprints.length !== 1 ? "s" : ""}
+              </span>
+            </div>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Fingerprint</th>
-                    <th style={{ width: "120px" }}>Impact</th>
-                    <th style={{ width: "180px" }}>Last Seen</th>
-                    <th style={{ width: "150px" }}>Platforms</th>
+                    <th style={{ width: "100px" }}>Occurrences</th>
+                    <th style={{ width: "130px" }}>First Seen</th>
+                    <th style={{ width: "130px" }}>Last Seen</th>
+                    <th style={{ width: "140px" }}>Platforms</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groupReportsByFingerprint(reports).map((group) => (
-                    <tr key={group.key}>
-                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>
-                          <span style={{
-                              display: "inline-block",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              background: "var(--c-bg)",
-                              border: "1px solid var(--c-border)"
-                          }}>
-                              {group.fingerprint.substring(0, 32)}{group.fingerprint.length > 32 ? "..." : ""}
-                          </span>
-                      </td>
-                      <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <span style={{ fontWeight: 700 }}>{group.count}</span>
-                              <div style={{
-                                  height: "4px",
-                                  flex: 1,
-                                  background: "var(--c-bg)",
-                                  borderRadius: "2px",
-                                  overflow: "hidden"
-                              }}>
-                                  <div style={{
-                                      height: "100%",
-                                      width: `${Math.min(100, (group.count / reports.length) * 100)}%`,
-                                      background: "var(--c-danger)"
-                                  }} />
-                              </div>
+                  {fingerprints.map((group) => {
+                    const impactPct = Math.min(100, (group.count / reports.length) * 300);
+                    return (
+                      <tr key={group.key}>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>
+                          <a
+                            href={`?project_id=${projectId}&region=${scope.region}&crash_fingerprint=${encodeURIComponent(group.fingerprint)}`}
+                            style={{ fontWeight: 600 }}
+                          >
+                            {group.fingerprint === "(none)"
+                              ? <span style={{ color: "var(--c-ink-faint)", fontStyle: "italic" }}>no fingerprint</span>
+                              : <>{group.fingerprint.substring(0, 28)}{group.fingerprint.length > 28 ? "…" : ""}</>
+                            }
+                          </a>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontWeight: 700, minWidth: "24px" }}>{group.count}</span>
+                            <div style={{ height: "4px", flex: 1, background: "var(--c-bg)", borderRadius: "2px", overflow: "hidden", minWidth: "40px" }}>
+                              <div style={{ height: "100%", width: `${impactPct}%`, background: "var(--c-danger)", borderRadius: "2px" }} />
+                            </div>
                           </div>
-                      </td>
-                      <td style={{ color: "var(--c-ink-soft)", fontSize: "0.85rem" }}>
-                          {new Date(group.lastSeenUnixMs).toLocaleString()}
-                      </td>
-                      <td>
-                          <div style={{ display: "flex", gap: "4px" }}>
+                        </td>
+                        <td style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)" }} title={new Date(group.firstSeenUnixMs).toLocaleString()}>
+                          {formatRelativeTime(group.firstSeenUnixMs)}
+                        </td>
+                        <td style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)" }} title={new Date(group.lastSeenUnixMs).toLocaleString()}>
+                          {formatRelativeTime(group.lastSeenUnixMs)}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "3px", flexWrap: "wrap" }}>
                             {group.platforms.map(p => (
-                                <span key={p} className="badge" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
-                                    {p}
-                                </span>
+                              <span key={p} className="badge" style={{ fontSize: "0.68rem", padding: "1px 6px" }}>
+                                {p}
+                              </span>
                             ))}
                           </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -178,17 +194,20 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
       {!dataError && reports.length > 0 && (
         <Card>
           <div style={{ padding: "var(--space-5)" }}>
-            <h3 style={{ marginTop: 0, marginBottom: "var(--space-4)", fontSize: "1.1rem" }}>Recent Reports</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+              <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: "1.1rem" }}>Recent Reports</h3>
+              <span style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)" }}>{reports.length} report{reports.length !== 1 ? "s" : ""}</span>
+            </div>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Report ID</th>
                     <th>Platform</th>
-                    <th>Version</th>
+                    <th>App Version</th>
                     <th>Fingerprint</th>
-                    <th>Events</th>
-                    <th>Generated</th>
+                    <th style={{ textAlign: "right" }}>Events</th>
+                    <th>When</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -200,28 +219,32 @@ export default async function CrashesPage({ searchParams = {}, basePath = "/dash
                     });
                     return (
                       <tr key={report.id}>
-                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>
                           <a href={`${basePath}/${report.id}?${detailQuery.toString()}`} style={{ fontWeight: 600 }}>
-                              {report.id.substring(0, 8)}...
+                              {report.id.substring(0, 8)}…
                           </a>
                         </td>
                         <td>
-                            <span className="badge" style={{ textTransform: "capitalize" }}>{report.platform}</span>
+                          <span className="badge" style={{ textTransform: "capitalize", fontSize: "0.72rem" }}>{report.platform}</span>
                         </td>
-                        <td style={{ fontSize: "0.9rem" }}>
-                          {report.app_version} <span style={{ color: "var(--c-ink-faint)" }}>({report.build_number})</span>
+                        <td style={{ fontSize: "0.875rem" }}>
+                          {report.app_version}
+                          {report.build_number && <span style={{ color: "var(--c-ink-faint)", fontSize: "0.8rem" }}> ({report.build_number})</span>}
                         </td>
-                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--c-ink-soft)" }}>
-                            {report.crash_fingerprint ? report.crash_fingerprint.substring(0, 12) + "..." : "-"}
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem", color: "var(--c-ink-soft)", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {report.crash_fingerprint ? report.crash_fingerprint.substring(0, 16) + "…" : <span style={{ color: "var(--c-ink-faint)" }}>—</span>}
                         </td>
-                        <td>{report.event_count}</td>
-                        <td style={{ fontSize: "0.85rem", color: "var(--c-ink-soft)" }}>
-                            {new Date(report.generated_at_unix_ms).toLocaleString()}
+                        <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{report.event_count}</td>
+                        <td
+                          style={{ fontSize: "0.82rem", color: "var(--c-ink-soft)", whiteSpace: "nowrap" }}
+                          title={new Date(report.generated_at_unix_ms).toLocaleString()}
+                        >
+                          {formatRelativeTime(report.generated_at_unix_ms)}
                         </td>
                         <td style={{ textAlign: "right" }}>
-                            <a href={`${basePath}/${report.id}?${detailQuery.toString()}`} className="btn btn-sm" style={{ padding: "4px 8px", fontSize: "0.8rem" }}>
-                                View
-                            </a>
+                          <a href={`${basePath}/${report.id}?${detailQuery.toString()}`} className="btn btn-sm" style={{ padding: "4px 10px", fontSize: "0.78rem" }}>
+                            View
+                          </a>
                         </td>
                       </tr>
                     );
@@ -241,6 +264,7 @@ function groupReportsByFingerprint(reports: Awaited<ReturnType<typeof listReport
     key: string;
     fingerprint: string;
     count: number;
+    firstSeenUnixMs: number;
     lastSeenUnixMs: number;
     platforms: Set<string>;
   }>();
@@ -250,6 +274,7 @@ function groupReportsByFingerprint(reports: Awaited<ReturnType<typeof listReport
     const existing = grouped.get(key);
     if (existing) {
       existing.count += 1;
+      existing.firstSeenUnixMs = Math.min(existing.firstSeenUnixMs, report.generated_at_unix_ms);
       existing.lastSeenUnixMs = Math.max(existing.lastSeenUnixMs, report.generated_at_unix_ms);
       existing.platforms.add(report.platform);
       continue;
@@ -258,6 +283,7 @@ function groupReportsByFingerprint(reports: Awaited<ReturnType<typeof listReport
       key,
       fingerprint: report.crash_fingerprint ?? "(none)",
       count: 1,
+      firstSeenUnixMs: report.generated_at_unix_ms,
       lastSeenUnixMs: report.generated_at_unix_ms,
       platforms: new Set([report.platform]),
     });
@@ -268,6 +294,7 @@ function groupReportsByFingerprint(reports: Awaited<ReturnType<typeof listReport
       key: group.key,
       fingerprint: group.fingerprint,
       count: group.count,
+      firstSeenUnixMs: group.firstSeenUnixMs,
       lastSeenUnixMs: group.lastSeenUnixMs,
       platforms: Array.from(group.platforms).sort(),
     }))
