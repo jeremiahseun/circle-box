@@ -18,7 +18,7 @@ export default async function OnboardingPage({ searchParams = {} }: OnboardingPa
       <Card>
         <div style={{ padding: 20 }}>
           <h1 style={{ marginBottom: 8 }}>Get Started</h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+          <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
             Your account is ready. Choose how you want to start using CircleBox Cloud.
           </p>
         </div>
@@ -26,14 +26,14 @@ export default async function OnboardingPage({ searchParams = {} }: OnboardingPa
 
       {success && (
         <Card>
-          <div style={{ padding: 14, color: "var(--accent-strong)" }}>
+          <div style={{ padding: 14, color: "var(--c-accent)" }}>
             Action completed: <code>{success}</code>
           </div>
         </Card>
       )}
       {error && (
         <Card>
-          <div style={{ padding: 14, color: "var(--danger)" }}>
+          <div style={{ padding: 14, color: "var(--c-danger)" }}>
             Action failed: <code>{error}</code>
           </div>
         </Card>
@@ -43,7 +43,7 @@ export default async function OnboardingPage({ searchParams = {} }: OnboardingPa
         <Card>
           <div style={{ padding: 18, display: "grid", gap: 10 }}>
             <h3 style={{ margin: 0 }}>Create New Project</h3>
-            <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
               Start a fresh project, pick region, then generate ingest and usage keys.
             </p>
             <a className="btn btn-primary" href="/app/projects/new">Create Project</a>
@@ -53,7 +53,7 @@ export default async function OnboardingPage({ searchParams = {} }: OnboardingPa
         <Card>
           <div style={{ padding: 18, display: "grid", gap: 10 }}>
             <h3 style={{ margin: 0 }}>Join Existing Project</h3>
-            <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
               Paste an invite token to join an existing organization workspace.
             </p>
             <form action="/api/invites/accept" method="POST" style={{ display: "grid", gap: 10 }}>
@@ -74,7 +74,7 @@ export default async function OnboardingPage({ searchParams = {} }: OnboardingPa
         <Card>
           <div style={{ padding: 18, display: "grid", gap: 10 }}>
             <h3 style={{ margin: 0 }}>Your Available Projects</h3>
-            <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            <p style={{ margin: 0, color: "var(--c-ink-soft)" }}>
               You already have access to {projects.length} project{projects.length === 1 ? "" : "s"}.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
