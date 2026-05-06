@@ -1,8 +1,10 @@
+import type { CSSProperties } from "react";
+
 type SkeletonProps = {
   width?: string | number;
   height?: string | number;
   radius?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 };
 
 export function Skeleton({ width = "100%", height = 16, radius = "4px", style }: SkeletonProps) {

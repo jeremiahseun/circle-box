@@ -54,7 +54,7 @@ function AttrsDisplay({ type, attrs }: { type: string; attrs: Record<string, unk
     return (
       <div style={{ fontSize: "0.82rem", fontFamily: "var(--font-mono)" }}>
         <div style={{ fontWeight: 700, color: "var(--c-danger)", marginBottom: 2 }}>{String(attrs.exception_type)}</div>
-        {attrs.exception_reason && <div style={{ color: "var(--c-ink-soft)", marginBottom: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{String(attrs.exception_reason)}</div>}
+        {!!attrs.exception_reason && <div style={{ color: "var(--c-ink-soft)", marginBottom: 4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{String(attrs.exception_reason)}</div>}
         {Array.isArray(attrs.stack_frames) && attrs.stack_frames.length > 0 && (
           <div style={{ marginTop: 4 }}>
             {(attrs.stack_frames as unknown[]).slice(0, 6).map((frame, i) => (
@@ -81,7 +81,7 @@ function AttrsDisplay({ type, attrs }: { type: string; attrs: Record<string, unk
       <div style={{ fontSize: "0.82rem", fontFamily: "var(--font-mono)", color: "var(--c-ink-soft)" }}>
         {used !== null && <span style={{ marginRight: 12 }}>Used: <strong style={{ color: "var(--c-ink)" }}>{toMB(used)}</strong></span>}
         {total !== null && <span>Total: <strong style={{ color: "var(--c-ink)" }}>{toMB(total)}</strong></span>}
-        {attrs.pressure && <span style={{ marginLeft: 12 }}>Pressure: <strong style={{ color: attrs.pressure === "critical" ? "var(--c-danger)" : "var(--c-ink)" }}>{String(attrs.pressure)}</strong></span>}
+        {!!attrs.pressure && <span style={{ marginLeft: 12 }}>Pressure: <strong style={{ color: attrs.pressure === "critical" ? "var(--c-danger)" : "var(--c-ink)" }}>{String(attrs.pressure)}</strong></span>}
       </div>
     );
   }
@@ -92,7 +92,7 @@ function AttrsDisplay({ type, attrs }: { type: string; attrs: Record<string, unk
     return (
       <div style={{ fontSize: "0.82rem", fontFamily: "var(--font-mono)" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2 }}>
-          {attrs.http_method && <span style={{ fontWeight: 700, color: "var(--c-primary)" }}>{String(attrs.http_method)}</span>}
+          {!!attrs.http_method && <span style={{ fontWeight: 700, color: "var(--c-primary)" }}>{String(attrs.http_method)}</span>}
           {status !== null && <span style={{ fontWeight: 700, color: statusColor }}>{status}</span>}
           {typeof attrs.duration_ms === "number" && <span style={{ color: "var(--c-ink-faint)" }}>{attrs.duration_ms}ms</span>}
         </div>
@@ -104,7 +104,7 @@ function AttrsDisplay({ type, attrs }: { type: string; attrs: Record<string, unk
   if ((type === "log" || type === "log_message") && attrs.log_message) {
     return (
       <div style={{ fontSize: "0.82rem", fontFamily: "var(--font-mono)", color: "var(--c-ink-soft)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-        {attrs.level && <span style={{ fontWeight: 700, marginRight: 8, color: "var(--c-ink)" }}>[{String(attrs.level).toUpperCase()}]</span>}
+        {!!attrs.level && <span style={{ fontWeight: 700, marginRight: 8, color: "var(--c-ink)" }}>[{String(attrs.level).toUpperCase()}]</span>}
         {String(attrs.log_message)}
       </div>
     );
@@ -432,8 +432,4 @@ function findLastIndex<T>(items: T[], predicate: (item: T) => boolean): number {
     if (predicate(items[index])) return index;
   }
   return -1;
-}
-
-function getSeverityStyle(severity: string) {
-  return SEVERITY_STYLES[severity.toLowerCase()] ?? { bg: "transparent", color: "var(--c-ink-soft)", label: severity.toUpperCase() };
 }
