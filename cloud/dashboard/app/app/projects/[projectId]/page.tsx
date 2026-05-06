@@ -1,12 +1,20 @@
 import { notFound } from "next/navigation";
 import { Card } from "../../../../components/ui/card";
-import { getProjectForUser, listApiKeysForProject } from "../../../../lib/control-plane";
+import { getProjectForUser, listApiKeysForProject, listUsageForProject } from "../../../../lib/control-plane";
 import { requireSession } from "../../../../lib/session";
 import { SectionTitle } from "../../../../components/ui/section-title";
 
 type ProjectOverviewPageProps = {
   params: { projectId: string };
 };
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 export default async function ProjectOverviewPage({ params }: ProjectOverviewPageProps) {
   const session = await requireSession();
@@ -19,9 +27,21 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
     notFound();
   }
 
-  // If no params are provided, we could redirect to keys or usage, but let's make a dashboard view
-  // Fetch some summary data
-  const keys = await listApiKeysForProject({ userId: session.userId, projectId: project.id });
+  const [keys, { usageRows }] = await Promise.all([
+    listApiKeysForProject({ userId: session.userId, projectId: project.id }),
+    listUsageForProject({ userId: session.userId, projectId: project.id, days: 30 }),
+  ]);
+
+  const totalReports = usageRows.reduce((sum, r) => sum + r.reports_count, 0);
+  const totalEvents = usageRows.reduce((sum, r) => sum + r.events_count, 0);
+  const totalBytes = usageRows.reduce((sum, r) => sum + r.bytes_count, 0);
+  const hasUsageData = usageRows.length > 0;
+
+  // Compute a simple trend: compare last 7 days vs prior 7 days
+  const sorted = [...usageRows].sort((a, b) => a.usage_date.localeCompare(b.usage_date));
+  const last7 = sorted.slice(-7).reduce((s, r) => s + r.reports_count, 0);
+  const prior7 = sorted.slice(-14, -7).reduce((s, r) => s + r.reports_count, 0);
+  const trendPct = prior7 > 0 ? Math.round(((last7 - prior7) / prior7) * 100) : null;
 
   return (
     <div className="dashboard-container">
@@ -29,7 +49,7 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
         <div>
             <h1 style={{ margin: "0 0 8px 0", fontSize: "1.75rem" }}>{project.name}</h1>
             <div className="page-meta">
-                <span className={`status-badge ${project.status === 'active' ? 'active' : ''}`}>{project.status}</span>
+                <span className={`status-badge ${project.status === "active" ? "active" : ""}`}>{project.status}</span>
                 <span className="meta-item">Region: {project.region.toUpperCase()}</span>
                 <span className="meta-item">Plan: {project.plan_tier}</span>
             </div>
@@ -38,7 +58,7 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
             <a href={`/app/projects/${project.id}/crashes`} className="btn btn-primary">
                 Explore Crashes
             </a>
-            <a href="https://docs.circlebox.dev" target="_blank" className="btn">
+            <a href="/docs" className="btn">
                 Integration Docs
             </a>
         </div>
@@ -47,29 +67,38 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
       {/* Stats Grid */}
       <div className="stats-grid">
         <Card className="stat-card">
-            <div className="stat-label">Total Crashes (30d)</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
+            <div className="stat-label">Crash Reports (30d)</div>
+            <div className="stat-value">{hasUsageData ? totalReports.toLocaleString() : "—"}</div>
+            <div className={`stat-delta ${trendPct !== null ? (trendPct > 0 ? "text-danger" : trendPct < 0 ? "text-success" : "text-neutral") : ""}`}>
+              {trendPct !== null
+                ? `${trendPct > 0 ? "+" : ""}${trendPct}% vs prior 7 days`
+                : hasUsageData ? "No trend data yet" : "No data yet – integrate the SDK"}
+            </div>
         </Card>
         <Card className="stat-card">
-            <div className="stat-label">Active Users (30d)</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
+            <div className="stat-label">Events Recorded (30d)</div>
+            <div className="stat-value">{hasUsageData ? totalEvents.toLocaleString() : "—"}</div>
+            <div className="stat-delta text-neutral">
+                {hasUsageData ? `across ${usageRows.length} active day${usageRows.length !== 1 ? "s" : ""}` : "No data yet"}
+            </div>
         </Card>
         <Card className="stat-card">
             <div className="stat-label">Active API Keys</div>
             <div className="stat-value">{keys.filter(k => k.active).length}</div>
             <div className="stat-delta text-neutral">
-                {keys.length} total keys
+                {keys.length} total key{keys.length !== 1 ? "s" : ""}
             </div>
         </Card>
         <Card className="stat-card">
-            <div className="stat-label">Storage Used</div>
-            <div className="stat-value">--</div>
-            <div className="stat-delta">Requires Usage API</div>
+            <div className="stat-label">Storage Used (30d)</div>
+            <div className="stat-value">{hasUsageData ? formatBytes(totalBytes) : "—"}</div>
+            <div className="stat-delta text-neutral">
+                {hasUsageData ? "ingest payload bytes" : "No data yet"}
+            </div>
         </Card>
       </div>
 
+      {/* Quick Actions */}
       <div className="dashboard-section">
         <SectionTitle title="Quick Actions" />
         <div className="action-grid">
@@ -170,6 +199,8 @@ export default async function ProjectOverviewPage({ params }: ProjectOverviewPag
         }
 
         .text-neutral { color: var(--c-ink-soft); }
+        .text-danger { color: var(--c-danger); font-weight: 600; }
+        .text-success { color: var(--c-success); font-weight: 600; }
 
         .action-grid {
             display: grid;
