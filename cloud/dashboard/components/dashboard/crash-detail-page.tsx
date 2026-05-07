@@ -135,7 +135,7 @@ export default async function CrashDetailPage({
                   </svg>
                   <div>
                     <div style={{ fontSize: "0.75rem", color: "var(--c-ink-soft)" }}>Last Screen</div>
-                    <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{lastScreenView.attrs?.screen ?? "unknown"}</div>
+                    <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{String(lastScreenView.attrs?.screen ?? "unknown")}</div>
                   </div>
                 </div>
               )}
@@ -147,7 +147,7 @@ export default async function CrashDetailPage({
                   <div>
                     <div style={{ fontSize: "0.75rem", color: "var(--c-ink-soft)" }}>Last User Action</div>
                     <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                      {lastUserAction.attrs?.action_type ?? "tap"} → {lastUserAction.attrs?.target ?? "unknown"}
+                      {String(lastUserAction.attrs?.action_type ?? "tap")} → {String(lastUserAction.attrs?.target ?? "unknown")}
                     </div>
                   </div>
                 </div>
@@ -333,14 +333,14 @@ export default async function CrashDetailPage({
                               pre-crash
                             </span>
                           )}
-                          {isScreenView && event.attrs?.screen && (
+                          {isScreenView && !!event.attrs?.screen && (
                             <span style={{ marginLeft: "6px", fontSize: "0.7rem", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "999px", fontFamily: "var(--font-sans)" }}>
-                              {event.attrs.screen}
+                              {String(event.attrs.screen)}
                             </span>
                           )}
-                          {isUserAction && event.attrs?.target && (
+                          {isUserAction && !!event.attrs?.target && (
                             <span style={{ marginLeft: "6px", fontSize: "0.7rem", padding: "1px 6px", background: "#dbeafe", color: "#1e40af", borderRadius: "999px", fontFamily: "var(--font-sans)" }}>
-                              {event.attrs.action_type ?? "tap"} → {event.attrs.target}
+                              {String(event.attrs.action_type ?? "tap")} → {String(event.attrs.target)}
                             </span>
                           )}
                         </td>

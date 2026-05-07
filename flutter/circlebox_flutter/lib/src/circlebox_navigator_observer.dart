@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import 'circlebox.dart';
@@ -66,7 +68,7 @@ class CircleBoxNavigatorObserver extends NavigatorObserver {
     if (from != null) {
       attrs['from'] = _nameExtractor(from);
     }
-    CircleBox.screenView(name, attrs: attrs);
+    unawaited(CircleBox.screenView(name, attrs: attrs));
   }
 }
 
