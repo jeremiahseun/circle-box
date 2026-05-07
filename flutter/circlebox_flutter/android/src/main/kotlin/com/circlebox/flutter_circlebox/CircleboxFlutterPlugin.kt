@@ -43,6 +43,23 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(null)
                 }
 
+                "screenView" -> {
+                    val name = call.argument<String>("name") ?: ""
+                    @Suppress("UNCHECKED_CAST")
+                    val attrs = call.argument<Map<String, String>>("attrs") ?: emptyMap()
+                    invokeScreenView(name, attrs)
+                    result.success(null)
+                }
+
+                "userAction" -> {
+                    val actionType = call.argument<String>("actionType") ?: ""
+                    val target = call.argument<String>("target") ?: ""
+                    @Suppress("UNCHECKED_CAST")
+                    val attrs = call.argument<Map<String, String>>("attrs") ?: emptyMap()
+                    invokeUserAction(actionType, target, attrs)
+                    result.success(null)
+                }
+
                 "exportLogs" -> {
                     @Suppress("UNCHECKED_CAST")
                     val args = call.arguments as? Map<String, Any?>
@@ -171,6 +188,32 @@ class CircleboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
         val withoutAttrs = clazz.getMethod("breadcrumb", String::class.java)
         withoutAttrs.invoke(null, message)
+    }
+
+    private fun invokeScreenView(name: String, attrs: Map<String, String>) {
+        val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        val withAttrs = runCatching { clazz.getMethod("screenView", String::class.java, Map::class.java) }.getOrNull()
+        if (withAttrs != null) {
+            withAttrs.invoke(null, name, attrs)
+            return
+        }
+        val withoutAttrs = runCatching { clazz.getMethod("screenView", String::class.java) }.getOrNull()
+        withoutAttrs?.invoke(null, name)
+    }
+
+    private fun invokeUserAction(actionType: String, target: String, attrs: Map<String, String>) {
+        val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        val withAttrs = runCatching {
+            clazz.getMethod("userAction", String::class.java, String::class.java, Map::class.java)
+        }.getOrNull()
+        if (withAttrs != null) {
+            withAttrs.invoke(null, actionType, target, attrs)
+            return
+        }
+        val withoutAttrs = runCatching {
+            clazz.getMethod("userAction", String::class.java, String::class.java)
+        }.getOrNull()
+        withoutAttrs?.invoke(null, actionType, target)
     }
 
     private fun invokeExportLogs(): List<String> {

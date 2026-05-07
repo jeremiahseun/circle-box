@@ -29,6 +29,16 @@ abstract class CircleBoxFlutterPlatform extends PlatformInterface {
     throw UnimplementedError('breadcrumb() has not been implemented.');
   }
 
+  /// Records a screen view event.
+  Future<void> screenView(String name, {Map<String, String> attrs = const {}}) {
+    throw UnimplementedError('screenView() has not been implemented.');
+  }
+
+  /// Records a user interaction event.
+  Future<void> userAction(String actionType, String target, {Map<String, String> attrs = const {}}) {
+    throw UnimplementedError('userAction() has not been implemented.');
+  }
+
   /// Exports current/pending logs and returns absolute file paths.
   Future<List<String>> exportLogs({Set<CircleBoxExportFormat> formats = const {CircleBoxExportFormat.json, CircleBoxExportFormat.csv}}) {
     throw UnimplementedError('exportLogs() has not been implemented.');

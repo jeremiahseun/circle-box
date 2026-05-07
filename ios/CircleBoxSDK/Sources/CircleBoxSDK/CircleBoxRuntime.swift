@@ -68,6 +68,19 @@ final class CircleBoxRuntime {
         record(type: "breadcrumb", severity: .info, attrs: final, thread: .main)
     }
 
+    func screenView(name: String, attrs: [String: String]) {
+        var merged = attrs
+        merged["screen"] = name
+        record(type: "screen_view", severity: .info, attrs: merged, thread: .main)
+    }
+
+    func userAction(actionType: String, target: String, attrs: [String: String]) {
+        var merged = attrs
+        merged["action_type"] = actionType
+        merged["target"] = target
+        record(type: "user_action", severity: .info, attrs: merged, thread: .main)
+    }
+
     func exportLogs(formats: Set<CircleBoxExportFormat>) throws -> [URL] {
         // Pending crash reports (written in a previous process) take precedence.
         let pendingEnvelope = fileStore.readPendingEnvelope()

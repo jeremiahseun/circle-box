@@ -75,6 +75,29 @@ internal class CircleBoxRuntime(
         )
     }
 
+    fun screenView(name: String, attrs: Map<String, String>) {
+        val merged = LinkedHashMap(attrs)
+        merged["screen"] = name
+        record(
+            type = "screen_view",
+            severity = CircleBoxEventSeverity.INFO,
+            attrs = merged,
+            thread = currentThreadType()
+        )
+    }
+
+    fun userAction(actionType: String, target: String, attrs: Map<String, String>) {
+        val merged = LinkedHashMap(attrs)
+        merged["action_type"] = actionType
+        merged["target"] = target
+        record(
+            type = "user_action",
+            severity = CircleBoxEventSeverity.INFO,
+            attrs = merged,
+            thread = currentThreadType()
+        )
+    }
+
     fun exportLogs(formats: Set<CircleBoxExportFormat>): List<java.io.File> {
         // Pending crash reports (from previous process runs) take precedence.
         val pendingEnvelope = fileStore.readPendingEnvelope()

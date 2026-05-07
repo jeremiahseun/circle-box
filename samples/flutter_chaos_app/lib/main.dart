@@ -69,6 +69,7 @@ class ChaosApp extends StatelessWidget {
     return MaterialApp(
       title: 'CircleBox Flutter Chaos',
       theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      navigatorObservers: [CircleBoxNavigatorObserver()], // auto screen tracking
       home: const ChaosHomeScreen(),
     );
   }
@@ -328,6 +329,14 @@ class _ChaosHomeScreenState extends State<ChaosHomeScreen> {
               _ActionButton(
                 title: 'Add Breadcrumb',
                 onPressed: () => _mock('User started Checkout', {'flow': 'checkout'}),
+              ),
+              _ActionButton(
+                title: 'Record Screen View',
+                onPressed: () => CircleBox.screenView('CheckoutScreen', attrs: {'flow': 'checkout'}),
+              ),
+              _ActionButton(
+                title: 'Record User Action',
+                onPressed: () => CircleBox.userAction('tap', 'SubmitOrderButton', attrs: {'flow': 'checkout'}),
               ),
             ],
           ),

@@ -44,6 +44,14 @@ class MainActivity : AppCompatActivity() {
             CircleBox.breadcrumb("User started Checkout", mapOf("flow" to "checkout"))
         }
 
+        findViewById<Button>(R.id.btnScreenView).setOnClickListener {
+            CircleBox.screenView("CheckoutScreen", mapOf("flow" to "checkout"))
+        }
+
+        findViewById<Button>(R.id.btnUserAction).setOnClickListener {
+            CircleBox.userAction("tap", "SubmitOrderButton", mapOf("flow" to "checkout"))
+        }
+
         findViewById<Button>(R.id.btnExport).setOnClickListener {
             val files = CircleBox.exportLogs()
             Toast.makeText(this, "Exported ${files.size} file(s)", Toast.LENGTH_SHORT).show()

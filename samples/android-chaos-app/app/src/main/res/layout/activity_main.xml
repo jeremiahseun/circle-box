@@ -46,6 +46,18 @@
             android:text="Add Breadcrumb" />
 
         <Button
+            android:id="@+id/btnScreenView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Record Screen View" />
+
+        <Button
+            android:id="@+id/btnUserAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Record User Action" />
+
+        <Button
             android:id="@+id/btnExport"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

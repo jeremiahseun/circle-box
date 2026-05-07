@@ -23,6 +23,23 @@ class MethodChannelCircleBoxFlutter extends CircleBoxFlutterPlatform {
   }
 
   @override
+  Future<void> screenView(String name, {Map<String, String> attrs = const {}}) async {
+    await methodChannel.invokeMethod<void>('screenView', {
+      'name': name,
+      'attrs': attrs,
+    });
+  }
+
+  @override
+  Future<void> userAction(String actionType, String target, {Map<String, String> attrs = const {}}) async {
+    await methodChannel.invokeMethod<void>('userAction', {
+      'actionType': actionType,
+      'target': target,
+      'attrs': attrs,
+    });
+  }
+
+  @override
   Future<List<String>> exportLogs({Set<CircleBoxExportFormat> formats = const {CircleBoxExportFormat.json, CircleBoxExportFormat.csv}}) async {
     final raw = await methodChannel.invokeListMethod<String>('exportLogs', {
       'formats': formats.map((item) => item.wireName).toList(),

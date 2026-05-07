@@ -38,3 +38,14 @@ export interface CircleBoxRealtimeOptions {
 export interface CircleBoxSubscription {
   remove(): void;
 }
+
+/** Options for the React Navigation integration helper. */
+export interface CircleBoxNavigationTrackerOptions {
+  /** Extract a display name from the current route state. Defaults to the focused route name. */
+  getRouteName?: (state: unknown) => string | undefined;
+}
+
+/** Minimal subset of the React Navigation NavigationContainerRef needed by the tracker. */
+export interface NavigationContainerRefLike {
+  getCurrentRoute(): { name: string; params?: Record<string, unknown> } | undefined;
+}

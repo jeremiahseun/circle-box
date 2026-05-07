@@ -41,6 +41,25 @@ class CircleBox {
     return CircleBoxFlutterPlatform.instance.breadcrumb(message, attrs: attrs);
   }
 
+  /// Records a screen view event into the ring buffer.
+  ///
+  /// Call this whenever the user navigates to a new screen so the crash
+  /// timeline shows which route was active before the crash.
+  ///
+  /// For automatic tracking with the Flutter Navigator, use [CircleBoxNavigatorObserver].
+  static Future<void> screenView(String name, {Map<String, String> attrs = const {}}) {
+    return CircleBoxFlutterPlatform.instance.screenView(name, attrs: attrs);
+  }
+
+  /// Records a user interaction event into the ring buffer.
+  ///
+  /// Use this for high-signal actions such as button taps, form submissions,
+  /// or gesture recognitions so the crash timeline captures what the user did
+  /// immediately before the failure.
+  static Future<void> userAction(String actionType, String target, {Map<String, String> attrs = const {}}) {
+    return CircleBoxFlutterPlatform.instance.userAction(actionType, target, attrs: attrs);
+  }
+
   /// Exports logs in the requested [formats] and returns absolute file paths.
   static Future<List<String>> exportLogs({Set<CircleBoxExportFormat> formats = const {CircleBoxExportFormat.json, CircleBoxExportFormat.csv}}) {
     return CircleBoxFlutterPlatform.instance.exportLogs(formats: formats);

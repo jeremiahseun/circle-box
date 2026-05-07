@@ -5,6 +5,8 @@ import type { CircleBoxDebugEvent, CircleBoxExportFormat } from './types';
 interface CircleBoxNativeModule {
   start(config?: Record<string, unknown>): Promise<void>;
   breadcrumb(message: string, attrs?: Record<string, string>): Promise<void>;
+  screenView(name: string, attrs?: Record<string, string>): Promise<void>;
+  userAction(actionType: string, target: string, attrs?: Record<string, string>): Promise<void>;
   exportLogs(formats?: CircleBoxExportFormat[]): Promise<string[]>;
   hasPendingCrashReport(): Promise<boolean>;
   clearPendingCrashReport(): Promise<void>;
