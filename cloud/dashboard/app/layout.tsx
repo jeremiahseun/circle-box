@@ -36,6 +36,25 @@ export default async function RootLayout(props: { children: ReactNode }) {
                 </p>
             </div>
         </footer>
+
+        {/* Global clipboard handler for copy buttons */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.copy-btn');
+            if (!btn) return;
+            const value = btn.getAttribute('data-copy');
+            if (!value) return;
+            navigator.clipboard.writeText(value).then(function() {
+              const orig = btn.textContent;
+              btn.textContent = 'copied!';
+              btn.style.color = 'var(--c-success)';
+              setTimeout(function() {
+                btn.textContent = orig;
+                btn.style.color = '';
+              }, 1500);
+            }).catch(function() {});
+          });
+        `}} />
       </body>
     </html>
   );

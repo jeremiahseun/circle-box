@@ -32,7 +32,7 @@ jobs:
       - name: Package plugin
         run: |
           mkdir -p artifacts
-          tar -czf artifacts/circlebox_flutter.tgz .
+          tar -czf artifacts/circlebox_flutter.tgz --exclude=./artifacts .
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +65,7 @@ jobs:
       - name: Package adapters artifact
         run: |
           mkdir -p artifacts
-          tar -czf artifacts/circlebox_adapters.tgz .
+          tar -czf artifacts/circlebox_adapters.tgz --exclude=./artifacts .
       - name: Upload adapters artifact
         uses: actions/upload-artifact@v4
         with:
@@ -98,7 +98,7 @@ jobs:
       - name: Package cloud artifact
         run: |
           mkdir -p artifacts
-          tar -czf artifacts/circlebox_cloud_flutter.tgz .
+          tar -czf artifacts/circlebox_cloud_flutter.tgz --exclude=./artifacts .
       - name: Upload cloud artifact
         uses: actions/upload-artifact@v4
         with:

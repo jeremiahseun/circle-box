@@ -37,6 +37,26 @@ class CircleBoxReactNativeModule(
     }
 
     @ReactMethod
+    fun screenView(name: String, attrs: ReadableMap?, promise: Promise) {
+        runCatching {
+            invokeScreenView(name, attrs?.toStringMap() ?: emptyMap())
+            promise.resolve(null)
+        }.getOrElse { error ->
+            promise.reject("circlebox_screen_view_failed", error.message, error)
+        }
+    }
+
+    @ReactMethod
+    fun userAction(actionType: String, target: String, attrs: ReadableMap?, promise: Promise) {
+        runCatching {
+            invokeUserAction(actionType, target, attrs?.toStringMap() ?: emptyMap())
+            promise.resolve(null)
+        }.getOrElse { error ->
+            promise.reject("circlebox_user_action_failed", error.message, error)
+        }
+    }
+
+    @ReactMethod
     fun exportLogs(formats: ReadableArray?, promise: Promise) {
         runCatching {
             val names = formats?.toStringList().orEmpty()
@@ -160,6 +180,32 @@ class CircleBoxReactNativeModule(
         val clazz = Class.forName("com.circlebox.sdk.CircleBox")
         val method = clazz.getMethod("breadcrumb", String::class.java, Map::class.java)
         method.invoke(null, message, attrs)
+    }
+
+    private fun invokeScreenView(name: String, attrs: Map<String, String>) {
+        val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        val withAttrs = runCatching { clazz.getMethod("screenView", String::class.java, Map::class.java) }.getOrNull()
+        if (withAttrs != null) {
+            withAttrs.invoke(null, name, attrs)
+            return
+        }
+        val withoutAttrs = runCatching { clazz.getMethod("screenView", String::class.java) }.getOrNull()
+        withoutAttrs?.invoke(null, name)
+    }
+
+    private fun invokeUserAction(actionType: String, target: String, attrs: Map<String, String>) {
+        val clazz = Class.forName("com.circlebox.sdk.CircleBox")
+        val withAttrs = runCatching {
+            clazz.getMethod("userAction", String::class.java, String::class.java, Map::class.java)
+        }.getOrNull()
+        if (withAttrs != null) {
+            withAttrs.invoke(null, actionType, target, attrs)
+            return
+        }
+        val withoutAttrs = runCatching {
+            clazz.getMethod("userAction", String::class.java, String::class.java)
+        }.getOrNull()
+        withoutAttrs?.invoke(null, actionType, target)
     }
 
     private fun invokeExportLogs(): List<String> {

@@ -22,6 +22,32 @@ public enum CircleBox {
         runtime.breadcrumb(message: message, attrs: attrs)
     }
 
+    /// Records a screen view event into the ring buffer.
+    ///
+    /// Call this whenever the user navigates to a new screen so the crash
+    /// timeline shows which view was active before the crash.
+    ///
+    /// - Parameters:
+    ///   - name: Screen or view controller name (e.g. `"HomeScreen"`).
+    ///   - attrs: Optional additional context.
+    public static func screenView(_ name: String, attrs: [String: String] = [:]) {
+        runtime.screenView(name: name, attrs: attrs)
+    }
+
+    /// Records a user interaction event into the ring buffer.
+    ///
+    /// Use this for high-signal actions such as button taps, form submissions,
+    /// or gesture recognitions so the crash timeline captures what the user did
+    /// immediately before the failure.
+    ///
+    /// - Parameters:
+    ///   - actionType: Category of the action (e.g. `"tap"`, `"swipe"`, `"submit"`).
+    ///   - target: Identifier of the element acted upon (e.g. `"LoginButton"`).
+    ///   - attrs: Optional additional context.
+    public static func userAction(_ actionType: String, target: String, attrs: [String: String] = [:]) {
+        runtime.userAction(actionType: actionType, target: target, attrs: attrs)
+    }
+
     /// Exports the latest report in the requested formats and returns file URLs.
     ///
     /// If a pending crash report exists from a previous launch, that report is exported.

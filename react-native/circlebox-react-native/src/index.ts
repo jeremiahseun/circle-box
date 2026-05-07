@@ -42,6 +42,39 @@ export class CircleBox {
     await requireNativeModule().breadcrumb(message, attrs);
   }
 
+  /**
+   * Records a screen view event into the ring buffer.
+   *
+   * Call this whenever the user navigates to a new screen so the crash
+   * timeline shows which screen was active before the crash.
+   *
+   * For automatic tracking with React Navigation, use {@link createCircleBoxNavigationListener}.
+   */
+  static async screenView(name: string, attrs: Record<string, string> = {}): Promise<void> {
+    const native = requireNativeModule();
+    if (native.screenView) {
+      await native.screenView(name, attrs);
+    } else {
+      await native.breadcrumb('screen_view', { screen: name, ...attrs });
+    }
+  }
+
+  /**
+   * Records a user interaction event into the ring buffer.
+   *
+   * Use this for high-signal actions such as button presses, form submissions,
+   * or gesture recognitions so the crash timeline captures what the user did
+   * immediately before the failure.
+   */
+  static async userAction(actionType: string, target: string, attrs: Record<string, string> = {}): Promise<void> {
+    const native = requireNativeModule();
+    if (native.userAction) {
+      await native.userAction(actionType, target, attrs);
+    } else {
+      await native.breadcrumb('user_action', { action_type: actionType, target, ...attrs });
+    }
+  }
+
   static async exportLogs(
     formats: CircleBoxExportFormat[] = DEFAULT_EXPORT_FORMATS,
   ): Promise<string[]> {
@@ -266,11 +299,15 @@ function sentryLevelFor(severity: string): string {
   }
 }
 
+export { createCircleBoxNavigationListener, useCircleBoxNavigationTracking } from './navigationTracker';
+
 export type {
   CircleBoxConfig,
   CircleBoxDebugEvent,
   CircleBoxErrorHookConfig,
   CircleBoxExportFormat,
+  CircleBoxNavigationTrackerOptions,
   CircleBoxRealtimeOptions,
   CircleBoxSubscription,
+  NavigationContainerRefLike,
 } from './types';

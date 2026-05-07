@@ -50,6 +50,20 @@ export default function App(): React.JSX.Element {
         },
       },
       {
+        label: 'Record Screen View',
+        onPress: async () => {
+          await CircleBox.screenView('CheckoutScreen', { flow: 'checkout' });
+          setStatus('Screen view recorded');
+        },
+      },
+      {
+        label: 'Record User Action',
+        onPress: async () => {
+          await CircleBox.userAction('tap', 'SubmitOrderButton', { flow: 'checkout' });
+          setStatus('User action recorded');
+        },
+      },
+      {
         label: 'Mock Thermal Spike',
         onPress: async () => {
           await CircleBox.breadcrumb('Mock thermal spike', { state: 'critical' });

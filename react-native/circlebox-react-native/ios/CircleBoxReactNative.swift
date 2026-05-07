@@ -55,6 +55,45 @@ final class CircleBoxReactNative: NSObject {
         #endif
     }
 
+    @objc(screenView:attrs:resolver:rejecter:)
+    func screenView(
+        _ name: String,
+        attrs: NSDictionary?,
+        resolver resolve: RCTPromiseResolveBlock,
+        rejecter reject: RCTPromiseRejectBlock
+    ) {
+        #if canImport(CircleBoxSDK)
+        let rawAttrs = attrs as? [String: Any] ?? [:]
+        let stringAttrs = rawAttrs.reduce(into: [String: String]()) { result, item in
+            result[item.key] = String(describing: item.value)
+        }
+        CircleBox.screenView(name, attrs: stringAttrs)
+        resolve(nil)
+        #else
+        reject("missing_native_sdk", "CircleBoxSDK is not linked in the iOS host app", nil)
+        #endif
+    }
+
+    @objc(userAction:target:attrs:resolver:rejecter:)
+    func userAction(
+        _ actionType: String,
+        target: String,
+        attrs: NSDictionary?,
+        resolver resolve: RCTPromiseResolveBlock,
+        rejecter reject: RCTPromiseRejectBlock
+    ) {
+        #if canImport(CircleBoxSDK)
+        let rawAttrs = attrs as? [String: Any] ?? [:]
+        let stringAttrs = rawAttrs.reduce(into: [String: String]()) { result, item in
+            result[item.key] = String(describing: item.value)
+        }
+        CircleBox.userAction(actionType, target: target, attrs: stringAttrs)
+        resolve(nil)
+        #else
+        reject("missing_native_sdk", "CircleBoxSDK is not linked in the iOS host app", nil)
+        #endif
+    }
+
     @objc(exportLogs:resolver:rejecter:)
     func exportLogs(
         _ formats: NSArray?,

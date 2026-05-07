@@ -41,6 +41,14 @@ struct ContentView: View {
                     CircleBox.breadcrumb("User started Checkout", attrs: ["flow": "checkout"])
                 }
 
+                Button("Record Screen View") {
+                    CircleBox.screenView("CheckoutScreen", attrs: ["flow": "checkout"])
+                }
+
+                Button("Record User Action") {
+                    CircleBox.userAction("tap", target: "SubmitOrderButton", attrs: ["flow": "checkout"])
+                }
+
                 Button("Export Logs") {
                     exportLogs()
                 }

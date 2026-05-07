@@ -51,6 +51,43 @@ public class CircleboxFlutterPlugin: NSObject, FlutterPlugin {
       result(FlutterError(code: "missing_native_sdk", message: "CircleBoxSDK is not linked in the iOS host app", details: nil))
       #endif
 
+    case "screenView":
+      guard
+        let args = call.arguments as? [String: Any],
+        let name = args["name"] as? String
+      else {
+        result(FlutterError(code: "bad_args", message: "Missing name", details: nil))
+        return
+      }
+
+      let attrs = args["attrs"] as? [String: String] ?? [:]
+
+      #if canImport(CircleBoxSDK)
+      CircleBox.screenView(name, attrs: attrs)
+      result(nil)
+      #else
+      result(FlutterError(code: "missing_native_sdk", message: "CircleBoxSDK is not linked in the iOS host app", details: nil))
+      #endif
+
+    case "userAction":
+      guard
+        let args = call.arguments as? [String: Any],
+        let actionType = args["actionType"] as? String,
+        let target = args["target"] as? String
+      else {
+        result(FlutterError(code: "bad_args", message: "Missing actionType or target", details: nil))
+        return
+      }
+
+      let attrs = args["attrs"] as? [String: String] ?? [:]
+
+      #if canImport(CircleBoxSDK)
+      CircleBox.userAction(actionType, target: target, attrs: attrs)
+      result(nil)
+      #else
+      result(FlutterError(code: "missing_native_sdk", message: "CircleBoxSDK is not linked in the iOS host app", details: nil))
+      #endif
+
     case "exportLogs":
       #if canImport(CircleBoxSDK)
       do {

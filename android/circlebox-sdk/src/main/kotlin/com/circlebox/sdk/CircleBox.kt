@@ -52,6 +52,46 @@ object CircleBox {
     }
 
     /**
+     * Records a screen view event into the ring buffer.
+     *
+     * Call this whenever the user navigates to a new screen so the crash
+     * timeline shows which view was active before the crash.
+     *
+     * @param name Screen or Activity/Fragment name (e.g. `"HomeScreen"`).
+     * @param attrs Optional additional context.
+     */
+    @JvmStatic
+    fun screenView(name: String, attrs: Map<String, String> = emptyMap()) {
+        runtime().screenView(name, attrs)
+    }
+
+    @JvmStatic
+    fun screenView(name: String) {
+        screenView(name, emptyMap())
+    }
+
+    /**
+     * Records a user interaction event into the ring buffer.
+     *
+     * Use this for high-signal actions such as button taps, form submissions,
+     * or gesture recognitions so the crash timeline captures what the user did
+     * immediately before the failure.
+     *
+     * @param actionType Category of the action (e.g. `"tap"`, `"swipe"`, `"submit"`).
+     * @param target Identifier of the element acted upon (e.g. `"LoginButton"`).
+     * @param attrs Optional additional context.
+     */
+    @JvmStatic
+    fun userAction(actionType: String, target: String, attrs: Map<String, String> = emptyMap()) {
+        runtime().userAction(actionType, target, attrs)
+    }
+
+    @JvmStatic
+    fun userAction(actionType: String, target: String) {
+        userAction(actionType, target, emptyMap())
+    }
+
+    /**
      * Exports the latest report to files and returns absolute file handles.
      */
     @JvmStatic
